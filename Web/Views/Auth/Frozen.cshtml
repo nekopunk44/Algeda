@@ -1,0 +1,20 @@
+@{
+    ViewData["Title"] = "Аккаунт заморожен";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-7 col-lg-5">
+        <div class="card shadow-sm border-0 rounded-3">
+            <div class="card-body p-4 p-md-5 text-center">
+                <h1 class="h4 text-primary mb-3">Аккаунт заморожен</h1>
+                <p class="text-muted mb-4">
+                    Ваш аккаунт временно заморожен администратором. Доступ к системе закрыт до разморозки аккаунта.
+                </p>
+                <form asp-controller="Auth" asp-action="Logout" method="post" class="d-grid">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-primary btn-lg">Выйти из аккаунта</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

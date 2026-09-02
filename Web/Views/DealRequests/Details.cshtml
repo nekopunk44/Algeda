@@ -1,0 +1,611 @@
+﻿@model Web.Models.DealRequests.DealRequestDetailsViewModel
+@using Web.Models.DealRequests
+@using Web.Models.Properties
+@inject Web.Services.ICurrencyFormatter CurrencyFormatter
+@{
+    ViewData["Title"] = "Заявка";
+
+    var deal = Model.Deal;
+    var returnScope = string.Equals(Model.ReturnScope, "mine", StringComparison.OrdinalIgnoreCase) ? "mine" : "incoming";
+    var returnSource = string.Equals(Model.ReturnSource, "sale", StringComparison.OrdinalIgnoreCase)
+        ? "sale"
+        : string.Equals(Model.ReturnSource, "purchase", StringComparison.OrdinalIgnoreCase)
+            ? "purchase"
+            : "all";
+
+    var isCreated = string.Equals(deal?.Status, "Created", StringComparison.OrdinalIgnoreCase);
+    var isInProgress = string.Equals(deal?.Status, "InProgress", StringComparison.OrdinalIgnoreCase);
+    var isSaleRequest = string.Equals(deal?.Source, "Sale", StringComparison.OrdinalIgnoreCase);
+    var isPropertyHidden = string.Equals(Model.Property?.Status, "Hidden", StringComparison.OrdinalIgnoreCase);
+    var hasActivePriority = deal?.PriorityRealtorId is not null
+        && deal.PriorityUntilUtc.HasValue
+        && deal.PriorityUntilUtc.Value > DateTime.UtcNow;
+
+    var canManageDeal = Model.IsAdmin || Model.IsRealtor;
+    var cancelButtonText = isSaleRequest ? "Отменить заявку" : "Отменить сделку";
+    var cancelConfirmText = isSaleRequest
+        ? "Вы уверены, что хотите отменить заявку?"
+        : "Вы уверены, что хотите отменить сделку?";
+
+    string FormatDocumentSize(long bytes)
+    {
+        if (bytes >= 1024 * 1024)
+        {
+            return $"{bytes / 1024d / 1024d:0.##} МБ";
+        }
+
+        return $"{Math.Max(1, bytes / 1024d):0.##} КБ";
+    }
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Заявка</h1>
+        <a asp-action="Index"
+           asp-route-scope="@returnScope"
+           asp-route-source="@returnSource"
+           asp-route-search="@Model.ReturnSearch"
+           asp-route-status="@Model.ReturnStatus"
+           asp-route-page="@Model.ReturnPage"
+           asp-route-pageSize="@Model.ReturnPageSize"
+           class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>К списку
+        </a>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+@if (deal is null)
+{
+    <div class="alert alert-light border">Заявка не найдена или недоступна.</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-body p-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                        <h2 class="h4 mb-0">Информация по заявке</h2>
+                        <span class="badge rounded-pill @DealRequestValueDisplay.StatusBadgeClass(deal.Status)">
+                            @DealRequestValueDisplay.Status(deal.Status)
+                        </span>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-3">
+                            <div class="small text-muted">Источник</div>
+                            <div>@DealRequestValueDisplay.Source(deal.Source)</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="small text-muted">Создана</div>
+                            <div>@deal.CreatedDate.ToString("dd.MM.yyyy HH:mm")</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="small text-muted">ID</div>
+                            <div class="text-break">@deal.Id</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="small text-muted">Ответственный</div>
+                            <div>@(string.IsNullOrWhiteSpace(deal.RealtorFullName) ? "Не назначен" : deal.RealtorFullName)</div>
+                        </div>
+                        @if (hasActivePriority)
+                        {
+                            <div class="col-md-3">
+                                <div class="small text-muted">Приоритет</div>
+                                <div>До @deal.PriorityUntilUtc!.Value.ToString("dd.MM.yyyy HH:mm")</div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(deal.RequestMessage))
+                    {
+                        <div class="mt-3">
+                            <div class="small text-muted">Комментарий клиента</div>
+                            <div>@deal.RequestMessage</div>
+                        </div>
+                    }
+                </div>
+            </section>
+
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-body p-4">
+                    <h2 class="h4 mb-3">Клиент</h2>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <div class="small text-muted">ФИО</div>
+                            <div>@deal.ClientFullName</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted">Телефон</div>
+                            <div>@deal.ClientPhoneNumber</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted">Email</div>
+                            <div>@(string.IsNullOrWhiteSpace(deal.ClientEmail) ? "—" : deal.ClientEmail)</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-body p-4">
+                    <h2 class="h4 mb-3">Объект недвижимости</h2>
+
+                    @if (Model.Property is null)
+                    {
+                        <div class="text-muted">@(string.IsNullOrWhiteSpace(deal.PropertyTitle) ? "Объект не указан" : deal.PropertyTitle)</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                            <div>
+                                <div class="fw-semibold">@Model.Property.Title</div>
+                                <div class="small text-muted">@Model.Property.Address</div>
+                            </div>
+                            <a asp-controller="Properties"
+                               asp-action="Details"
+                               asp-route-id="@Model.Property.Id"
+                               class="btn btn-outline-primary btn-sm">Открыть объект</a>
+                        </div>
+
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <div class="small text-muted">Цена</div>
+                                <div>@CurrencyFormatter.Format(Model.Property.Price)</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="small text-muted">Площадь</div>
+                                <div>@Model.Property.Area.ToString("N1") м²</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="small text-muted">Комнат</div>
+                                <div>@Model.Property.RoomsCount</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="small text-muted">Тип</div>
+                                <div>@PropertyValueDisplay.Type(Model.Property.Type)</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+
+            @if (Model.Requirement is not null)
+            {
+                <section class="card border-0 shadow-sm mb-3">
+                    <div class="card-body p-4">
+                        <h2 class="h4 mb-3">Требования из подбора</h2>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <div class="small text-muted">Тип</div>
+                                <div>@Model.Requirement.DesiredType</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="small text-muted">Цена</div>
+                                <div>@CurrencyFormatter.Format(Model.Requirement.MinPrice) - @CurrencyFormatter.Format(Model.Requirement.MaxPrice)</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="small text-muted">Мин. площадь</div>
+                                <div>@Model.Requirement.MinArea.ToString("N1") м²</div>
+                            </div>
+                        </div>
+
+                        @if (Model.Requirement.Criteria.Count == 0)
+                        {
+                            <div class="text-muted">Дополнительные критерии не указаны.</div>
+                        }
+                        else
+                        {
+                            <div class="list-group">
+                                @foreach (var criterion in Model.Requirement.Criteria)
+                                {
+                                    var hasMultiValues = criterion.Values is { Count: > 0 };
+                                    var valueText = hasMultiValues
+                                        ? string.Join(", ", criterion.Values)
+                                        : (string.IsNullOrWhiteSpace(criterion.Value) ? "Не указано" : criterion.Value);
+
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-start gap-2">
+                                            <div>
+                                                <div class="fw-semibold">Критерий: @criterion.CriterionDefinitionId</div>
+                                                <div class="small text-muted">Приоритет: @DealRequestValueDisplay.RequirementPriority(criterion.Priority)</div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">@valueText</div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
+
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-body p-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                        <div>
+                            <h2 class="h4 mb-1">Документы</h2>
+                            <div class="text-muted small">Файлы доступны только ответственному риелтору и администраторам.</div>
+                        </div>
+                    </div>
+
+                    <form asp-action="AddDocument" method="post" enctype="multipart/form-data" class="border rounded-3 p-3 mb-3 bg-light">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@deal.Id" />
+                        <input type="hidden" name="scope" value="@returnScope" />
+                        <input type="hidden" name="source" value="@returnSource" />
+                        <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                        <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                        <input type="hidden" name="page" value="@Model.ReturnPage" />
+                        <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                        <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label">Название документа</label>
+                                <input type="text" name="title" class="form-control" maxlength="200" required />
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label">
+                                    Файл <span class="text-muted fw-normal">(PDF, Word, JPG, PNG, WEBP. До 5 МБ.)</span>
+                                </label>
+                                <input type="file"
+                                       name="file"
+                                       class="form-control"
+                                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                                       required />
+                            </div>
+                            <div class="col-md-2 d-grid">
+                                <button type="submit" class="btn btn-outline-primary">Добавить</button>
+                            </div>
+                        </div>
+                    </form>
+
+                    @if (Model.Documents.Count == 0)
+                    {
+                        <div class="alert alert-light border mb-0">Документы по заявке пока не добавлены.</div>
+                    }
+                    else
+                    {
+                        <div class="d-grid gap-2">
+                            @foreach (var document in Model.Documents)
+                            {
+                                <div class="border rounded-3 p-3">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <div class="fw-semibold">@document.Title</div>
+                                            <div class="small text-muted">@document.OriginalFileName</div>
+                                            <div class="small text-muted">
+                                                @FormatDocumentSize(document.FileSizeBytes) | Добавил: @document.UploadedByText | @document.CreatedDate.ToString("dd.MM.yyyy HH:mm")
+                                            </div>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <a asp-action="DownloadDocument"
+                                               asp-route-id="@deal.Id"
+                                               asp-route-documentId="@document.Id"
+                                               class="btn btn-outline-primary btn-sm"
+                                               target="_blank">
+                                                Открыть
+                                            </a>
+                                            <form asp-action="DeleteDocument" method="post" class="m-0" onsubmit="return confirm('Удалить документ?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@deal.Id" />
+                                                <input type="hidden" name="documentId" value="@document.Id" />
+                                                <input type="hidden" name="scope" value="@returnScope" />
+                                                <input type="hidden" name="source" value="@returnSource" />
+                                                <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                                                <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                                                <input type="hidden" name="page" value="@Model.ReturnPage" />
+                                                <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                                                <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+
+            <section class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="h4 mb-3">Заметки</h2>
+
+                    <form asp-action="AddNote" method="post" class="mb-4">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@deal.Id" />
+                        <input type="hidden" name="scope" value="@returnScope" />
+                        <input type="hidden" name="source" value="@returnSource" />
+                        <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                        <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                        <input type="hidden" name="page" value="@Model.ReturnPage" />
+                        <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                        <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+
+                        <label class="form-label">Новая заметка</label>
+                        <textarea name="text" class="form-control mb-2" rows="3" required></textarea>
+                        <button type="submit" class="btn btn-outline-primary btn-sm">Добавить заметку</button>
+                    </form>
+
+                    @if (deal.Notes.Count == 0)
+                    {
+                        <div class="alert alert-light border mb-0">Пока нет заметок по заявке.</div>
+                    }
+                    else
+                    {
+                        <div class="d-grid gap-2">
+                            @foreach (var note in deal.Notes)
+                            {
+                                <div class="border rounded-3 p-3">
+                                    <form asp-action="UpdateNote" method="post" class="mb-2">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@deal.Id" />
+                                        <input type="hidden" name="noteId" value="@note.Id" />
+                                        <input type="hidden" name="scope" value="@returnScope" />
+                                        <input type="hidden" name="source" value="@returnSource" />
+                                        <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                                        <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                                        <input type="hidden" name="page" value="@Model.ReturnPage" />
+                                        <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                                        <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+
+                                        <label class="form-label small text-muted mb-1">
+                                            Добавлена: @note.CreatedDate.ToString("dd.MM.yyyy HH:mm")
+                                            @if (note.UpdatedAtUtc.HasValue)
+                                            {
+                                                <text> | Обновлена: @note.UpdatedAtUtc.Value.ToString("dd.MM.yyyy HH:mm")</text>
+                                            }
+                                        </label>
+                                        <textarea name="text" class="form-control mb-2" rows="2" required>@note.Text</textarea>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button type="submit" class="btn btn-outline-primary btn-sm">Сохранить</button>
+                                        </div>
+                                    </form>
+
+                                    <form asp-action="DeleteNote" method="post" class="m-0" onsubmit="return confirm('Удалить заметку?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@deal.Id" />
+                                        <input type="hidden" name="noteId" value="@note.Id" />
+                                        <input type="hidden" name="scope" value="@returnScope" />
+                                        <input type="hidden" name="source" value="@returnSource" />
+                                        <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                                        <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                                        <input type="hidden" name="page" value="@Model.ReturnPage" />
+                                        <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                                        <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
+                                    </form>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+        </div>
+
+        <div class="col-xl-4">
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Действия</h2>
+
+                    @if (deal.RealtorId.HasValue && deal.RealtorId.Value != Guid.Empty && !deal.IsIncoming)
+                    {
+                        <div class="d-grid mb-3">
+                            <a asp-controller="DealChat"
+                               asp-action="Deal"
+                               asp-route-dealId="@deal.Id"
+                               asp-route-returnUrl="@Url.Action("Details", "DealRequests", new { id = deal.Id, scope = returnScope, source = returnSource, search = Model.ReturnSearch, status = Model.ReturnStatus, page = Model.ReturnPage, pageSize = Model.ReturnPageSize })"
+                               class="btn btn-outline-primary btn-sm">
+                                Открыть чат по сделке
+                            </a>
+                        </div>
+                    }
+
+                    @if (isSaleRequest && canManageDeal)
+                    {
+                        <div class="d-grid mb-3">
+                            <a asp-controller="SellProperty"
+                               asp-action="EditManaged"
+                               asp-route-id="@deal.Id"
+                               asp-route-scope="@returnScope"
+                               asp-route-source="@returnSource"
+                               asp-route-search="@Model.ReturnSearch"
+                               asp-route-status="@Model.ReturnStatus"
+                               asp-route-page="@Model.ReturnPage"
+                               asp-route-pageSize="@Model.ReturnPageSize"
+                               class="btn btn-outline-primary btn-sm">Редактировать заявку</a>
+                        </div>
+                    }
+
+                    @if (Model.IsRealtor && deal.IsIncoming && isCreated)
+                    {
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <form asp-action="Accept" method="post" class="m-0">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@deal.Id" />
+                                <input type="hidden" name="scope" value="@returnScope" />
+                                <input type="hidden" name="source" value="@returnSource" />
+                                <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                                <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                                <input type="hidden" name="page" value="@Model.ReturnPage" />
+                                <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                                <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+                                <button type="submit" class="btn btn-success btn-sm">Принять</button>
+                            </form>
+
+                            <form asp-action="Reject" method="post" class="m-0" onsubmit="return confirm('Отклонить заявку?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@deal.Id" />
+                                <input type="hidden" name="scope" value="@returnScope" />
+                                <input type="hidden" name="source" value="@returnSource" />
+                                <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                                <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                                <input type="hidden" name="page" value="@Model.ReturnPage" />
+                                <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                                <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm">Отклонить</button>
+                            </form>
+                        </div>
+                    }
+
+                    @if (canManageDeal && isInProgress)
+                    {
+                        @if (!isSaleRequest)
+                        {
+                            <form asp-action="Complete" method="post" class="mb-3" onsubmit="return confirm('Вы уверены, что хотите завершить сделку?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@deal.Id" />
+                                <input type="hidden" name="scope" value="@returnScope" />
+                                <input type="hidden" name="source" value="@returnSource" />
+                                <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                                <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                                <input type="hidden" name="page" value="@Model.ReturnPage" />
+                                <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                                <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+
+                                <label class="form-label">Комиссия</label>
+                                <div class="input-group mb-3">
+                                    <input type="number" name="commissionAmount" min="0.01" step="0.01" class="form-control" value="1000" required />
+                                    <input type="text" name="commissionCurrency" class="form-control" value="USD" maxlength="3" style="max-width: 90px;" required />
+                                </div>
+                                <div class="form-text mb-3">
+                                    Укажите общую комиссию агентства. Выплата риелтору и чистый доход агентства будут рассчитаны автоматически по уровню риелтора и сохранены в сделке.
+                                </div>
+
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-outline-success btn-sm w-100">Завершить сделку</button>
+                                </div>
+                            </form>
+                        }
+                        else
+                        {
+                            @if (isPropertyHidden)
+                            {
+                                <form asp-action="PublishProperty" method="post" class="mb-3" onsubmit="return confirm('Опубликовать объект на карте?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@deal.Id" />
+                                    <input type="hidden" name="scope" value="@returnScope" />
+                                    <input type="hidden" name="source" value="@returnSource" />
+                                    <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                                    <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                                    <input type="hidden" name="page" value="@Model.ReturnPage" />
+                                    <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                                    <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+                                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">Опубликовать объект</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <div class="alert alert-light border small mb-3">
+                                    Объект уже опубликован.
+                                </div>
+                            }
+                        }
+
+                        <div class="d-grid gap-2">
+                            <form asp-action="Cancel" method="post" class="m-0" onsubmit="return confirm('@cancelConfirmText');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@deal.Id" />
+                                <input type="hidden" name="scope" value="@returnScope" />
+                                <input type="hidden" name="source" value="@returnSource" />
+                                <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                                <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                                <input type="hidden" name="page" value="@Model.ReturnPage" />
+                                <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                                <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+                                <button type="submit" class="btn btn-outline-secondary btn-sm w-100">@cancelButtonText</button>
+                            </form>
+
+                            @if (Model.IsRealtor)
+                            {
+                                <form asp-action="Release" method="post" class="m-0" onsubmit="return confirm('Вы уверены, что хотите отказаться от заявки и вернуть её в общий пул?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@deal.Id" />
+                                    <input type="hidden" name="scope" value="@returnScope" />
+                                    <input type="hidden" name="source" value="@returnSource" />
+                                    <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                                    <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                                    <input type="hidden" name="page" value="@Model.ReturnPage" />
+                                    <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                                    <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+                                    <button type="submit" class="btn btn-outline-warning btn-sm w-100">Отказаться от заявки</button>
+                                </form>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+
+            @if (Model.IsAdmin)
+            {
+                <section class="card border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        <h2 class="h5 mb-3">Ответственный риелтор</h2>
+
+                        <form asp-action="Details" method="get" class="mb-3">
+                            <input type="hidden" name="id" value="@deal.Id" />
+                            <input type="hidden" name="scope" value="@returnScope" />
+                            <input type="hidden" name="source" value="@returnSource" />
+                            <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                            <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                            <input type="hidden" name="page" value="@Model.ReturnPage" />
+                            <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+
+                            <label class="form-label">Поиск риелтора</label>
+                            <div class="input-group">
+                                <input type="text" name="realtorSearch" class="form-control" value="@Model.RealtorSearch" placeholder="ФИО, телефон или email" />
+                                <button type="submit" class="btn btn-outline-primary">Найти</button>
+                            </div>
+                        </form>
+
+                        <form asp-action="AssignRealtor" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@deal.Id" />
+                            <input type="hidden" name="scope" value="@returnScope" />
+                            <input type="hidden" name="source" value="@returnSource" />
+                            <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                            <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                            <input type="hidden" name="page" value="@Model.ReturnPage" />
+                            <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+                            <input type="hidden" name="realtorSearch" value="@Model.RealtorSearch" />
+
+                            <label class="form-label">Назначить</label>
+                            <select name="realtorId" class="form-select mb-2" required>
+                                <option value="">Выберите риелтора</option>
+                                @foreach (var candidate in Model.RealtorCandidates)
+                                {
+                                    <option value="@candidate.RealtorId" selected="@(deal.RealtorId == candidate.RealtorId ? "selected" : null)">
+                                        @candidate.Display
+                                    </option>
+                                }
+                            </select>
+
+                            @if (Model.RealtorCandidates.Count == 0)
+                            {
+                                <div class="small text-muted mb-2">
+                                    По текущему поиску риелторы не найдены.
+                                </div>
+                            }
+
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Сохранить назначение</button>
+                        </form>
+                    </div>
+                </section>
+            }
+        </div>
+    </div>
+}

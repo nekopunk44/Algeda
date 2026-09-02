@@ -1,0 +1,88 @@
+﻿@model Web.Models.Auth.RegisterClientRequest
+@{
+    ViewData["Title"] = "Регистрация клиента";
+}
+
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-8 col-xl-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h3 mb-3">Регистрация клиента</h1>
+                <p class="text-muted mb-3">
+                    После отправки формы на указанный email придет шестизначный код. Аккаунт будет создан после подтверждения кода.
+                </p>
+
+                @if (ViewData["ApiError"] is Web.Models.Api.ApiErrorViewModel apiError)
+                {
+                    <partial name="_ApiErrorAlert" model="apiError" />
+                }
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                }
+
+                <form asp-action="RegisterClient" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+
+                    <div class="col-md-4">
+                        <label asp-for="LastName" class="form-label">Фамилия</label>
+                        <input asp-for="LastName" class="form-control" />
+                        <span asp-validation-for="LastName" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="FirstName" class="form-label">Имя</label>
+                        <input asp-for="FirstName" class="form-control" />
+                        <span asp-validation-for="FirstName" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="MiddleName" class="form-label">Отчество (необязательно)</label>
+                        <input asp-for="MiddleName" class="form-control" />
+                        <span asp-validation-for="MiddleName" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="Email" class="form-label">Email</label>
+                        <input asp-for="Email" class="form-control" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="PhoneNumber" class="form-label">Телефон</label>
+                        <input asp-for="PhoneNumber" class="form-control" placeholder="+373 (79) 000-000" />
+                        <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="Password" class="form-label">Пароль</label>
+                        <div class="input-group password-input-group">
+                            <input asp-for="Password" type="password" class="form-control" autocomplete="new-password" />
+                            <button class="btn btn-outline-secondary password-toggle" type="button" aria-label="Показать пароль" title="Показать пароль">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <span asp-validation-for="Password" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="ConfirmPassword" class="form-label">Повтор пароля</label>
+                        <div class="input-group password-input-group">
+                            <input asp-for="ConfirmPassword" type="password" class="form-control" autocomplete="new-password" />
+                            <button class="btn btn-outline-secondary password-toggle" type="button" aria-label="Показать пароль" title="Показать пароль">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-12 d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+                        <a asp-action="Register" class="btn btn-outline-secondary">Назад</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

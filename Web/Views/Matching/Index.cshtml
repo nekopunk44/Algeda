@@ -1,0 +1,629 @@
+@model Web.Models.Dashboard.ClientDashboardViewModel
+@using System.Globalization
+@using System.Text.Json
+@inject Web.Services.ICurrencyFormatter CurrencyFormatter
+@{
+    ViewData["Title"] = "Подбор недвижимости";
+
+    static bool IsKnownPropertyType(string value)
+    {
+        return value is "Apartment" or "House" or "Commercial" or "Land";
+    }
+
+    static string PropertyTypeLabel(string value)
+    {
+        return value switch
+        {
+            "Apartment" => "Квартира",
+            "House" => "Дом",
+            "Commercial" => "Коммерческая",
+            "Land" => "Участок",
+            _ => value
+        };
+    }
+
+    var requirement = Model.ActiveRequirement;
+
+    var propertyTypeOptions = new[]
+    {
+        new { Value = "Apartment", Label = "Квартира" },
+        new { Value = "House", Label = "Дом" },
+        new { Value = "Commercial", Label = "Коммерческая" },
+        new { Value = "Land", Label = "Участок" }
+    };
+
+    var selectedDesiredTypes = requirement?.DesiredTypes?
+        .Where(IsKnownPropertyType)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList()
+        ?? [];
+
+    if (selectedDesiredTypes.Count == 0 && requirement is not null && IsKnownPropertyType(requirement.DesiredType))
+    {
+        selectedDesiredTypes.Add(requirement.DesiredType);
+    }
+
+    var desiredTypeSummary = selectedDesiredTypes.Count == 0
+        ? "Не важно"
+        : string.Join(", ", selectedDesiredTypes.Select(PropertyTypeLabel));
+
+    var defaultLat = requirement?.Latitude ?? 47.0105;
+    var defaultLng = requirement?.Longitude ?? 28.8638;
+    var defaultRadiusKm = Math.Round((requirement?.SearchRadiusMeters ?? 5000d) / 1000d, 1);
+    var defaultMinPrice = requirement?.MinPrice ?? 0m;
+    var defaultMaxPrice = requirement?.MaxPrice ?? 200000m;
+    var defaultPriceCurrency = requirement?.PriceCurrency ?? CurrencyFormatter.GetClientSettings().BaseCurrencyCode;
+    var defaultMinArea = requirement?.MinArea ?? 30d;
+    var defaultMaxArea = requirement?.MaxArea;
+    var defaultAddressQuery = requirement?.AddressQuery ?? string.Empty;
+    var defaultMatchPercent = (requirement?.MinMatchPercentage ?? 0.7d) * 100d;
+    var defaultIgnoreArea = requirement?.IgnoreArea ?? false;
+
+    var areaSummary = requirement is null
+        ? "-"
+        : requirement.MaxArea.HasValue
+            ? $"{requirement.MinArea:N1} - {requirement.MaxArea.Value:N1} м²"
+            : $"от {requirement.MinArea:N1} м²";
+
+    var addressSummary = string.IsNullOrWhiteSpace(requirement?.AddressQuery)
+        ? "Не важно"
+        : requirement.AddressQuery!;
+
+    var searchAreaSummary = requirement is null
+        ? "-"
+        : requirement.IgnoreArea
+            ? "Без ограничения по карте"
+            : $"{(requirement.SearchRadiusMeters / 1000d):N1} км";
+
+    var matchingReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
+    var detailsReturnUrl = Model.CanManageRequirement ? matchingReturnUrl : "__history_back__";
+
+    var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+    var initJson = JsonSerializer.Serialize(new
+    {
+        criteriaDefinitions = Model.CriterionDefinitions.Select(x => new
+        {
+            id = x.Id,
+            displayName = x.DisplayName,
+            category = x.Category,
+            description = x.Description,
+            valueType = x.ValueType,
+            options = x.Options
+                .OrderBy(o => o.SortOrder)
+                .ThenBy(o => o.Label)
+                .Select(o => new { value = o.Value, label = o.Label })
+        }),
+        selectedCriteria = requirement?.Criteria?.Select(x => new
+        {
+            criterionDefinitionId = x.CriterionDefinitionId,
+            priority = x.Priority,
+            value = x.Value,
+            values = x.Values
+        }) ?? [],
+        matchResults = Model.MatchResults.Select(x => new
+        {
+            x.PropertyId,
+            x.Title,
+            x.Address,
+            x.Price,
+            x.OriginalPriceAmount,
+            x.OriginalPriceCurrency,
+            x.Area,
+            x.RoomsCount,
+            x.Latitude,
+            x.Longitude,
+            x.DistanceMeters,
+            x.MatchScore,
+            DetailsUrl = Url.Action("Details", "Properties", new { id = x.PropertyId, returnUrl = detailsReturnUrl })
+        }),
+        pricing = CurrencyFormatter.GetClientSettings(),
+        requirementId = requirement?.Id,
+        defaultLat,
+        defaultLng,
+        showDistance = !(requirement?.IgnoreArea ?? false)
+    }, jsonOptions);
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Подбор недвижимости</h1>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+            <div>
+                @if (Model.CanManageRequirement)
+                {
+                    <h2 class="h4 mb-1">Мой активный подбор</h2>
+                    <div class="text-muted small">Один активный подбор на пользователя.</div>
+                }
+                else
+                {
+                    <h2 class="h4 mb-1">Тестовый поиск недвижимости</h2>
+                    <div class="text-muted small">Режим без сохранения, подписки и уведомлений.</div>
+                }
+            </div>
+            @if (requirement is not null && Model.CanManageRequirement)
+            {
+                <div class="d-flex flex-wrap gap-2">
+                    <form asp-action="RunMatching" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="matchLimit" value="@Model.MatchLimit" />
+                        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-play-fill me-1"></i> Запустить подбор
+                        </button>
+                    </form>
+                    <form asp-action="Subscribe" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="requirementId" value="@requirement.Id" />
+                        <input type="hidden" name="matchLimit" value="@Model.MatchLimit" />
+                        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-bell me-1"></i> Подписаться на уведомления
+                        </button>
+                    </form>
+                    <form asp-action="DeleteRequirement" method="post" onsubmit="return confirm('Удалить активный подбор?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="requirementId" value="@requirement.Id" />
+                        <input type="hidden" name="matchLimit" value="@Model.MatchLimit" />
+                        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash3 me-1"></i> Удалить
+                        </button>
+                    </form>
+                </div>
+            }
+        </div>
+
+        @if (requirement is null)
+        {
+            @if (Model.CanManageRequirement)
+            {
+                <div class="alert alert-light border mb-0">
+                    Активных подборов пока нет. Создайте новый подбор ниже.
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-light border mb-0">
+                    Заполните параметры ниже и запустите поиск.
+                </div>
+            }
+        }
+        else
+        {
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <div class="detail-chip">
+                        <div class="small text-muted">Тип недвижимости</div>
+                        <div class="fw-semibold">@desiredTypeSummary</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="detail-chip">
+                        <div class="small text-muted">Цена</div>
+                        <div class="fw-semibold">@CurrencyFormatter.Format(requirement.MinPrice, requirement.PriceCurrency) - @CurrencyFormatter.Format(requirement.MaxPrice, requirement.PriceCurrency)</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="detail-chip">
+                        <div class="small text-muted">Площадь</div>
+                        <div class="fw-semibold">@areaSummary</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="detail-chip">
+                        <div class="small text-muted">Адресный фильтр</div>
+                        <div class="fw-semibold">@addressSummary</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="detail-chip">
+                        <div class="small text-muted">Область поиска</div>
+                        <div class="fw-semibold">@searchAreaSummary</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="detail-chip">
+                        <div class="small text-muted">Мин. совпадение</div>
+                        <div class="fw-semibold">@((requirement.MinMatchPercentage * 100).ToString("N0"))%</div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-4">
+        <h2 class="h4 mb-3">Настройка подбора</h2>
+
+        <form asp-action="@(Model.CanManageRequirement ? "SaveRequirement" : "RunPreview")" method="post" id="requirementForm" class="row g-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="matchLimit" value="@Model.MatchLimit" />
+            <input type="hidden" name="sortBy" value="@Model.SortBy" />
+
+            <div class="col-md-4">
+                <label class="form-label">Тип недвижимости</label>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="desiredTypesDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-summary-empty="Не важно">
+                        <span id="desiredTypesSummary">@desiredTypeSummary</span>
+                    </button>
+                    <ul class="dropdown-menu w-100 p-2" aria-labelledby="desiredTypesDropdown">
+                        @foreach (var option in propertyTypeOptions)
+                        {
+                            var isChecked = selectedDesiredTypes.Any(x => string.Equals(x, option.Value, StringComparison.OrdinalIgnoreCase));
+                            <li>
+                                <label class="dropdown-item d-flex align-items-center gap-2 rounded-2 py-2">
+                                    <input class="form-check-input mt-0 js-desired-type-option"
+                                           type="checkbox"
+                                           name="desiredTypes"
+                                           value="@option.Value"
+                                           checked="@(isChecked ? "checked" : null)" />
+                                    <span>@option.Label</span>
+                                </label>
+                            </li>
+                        }
+                    </ul>
+                </div>
+                <div class="form-text">Если ничего не выбрано, тип не учитывается.</div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Цена от</label>
+                <input type="number" name="minPrice" class="form-control" min="0" value="@defaultMinPrice.ToString("0", CultureInfo.InvariantCulture)" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Цена до</label>
+                <input type="number" name="maxPrice" class="form-control" min="0" value="@defaultMaxPrice.ToString("0", CultureInfo.InvariantCulture)" required />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Валюта</label>
+                <select name="priceCurrency" class="form-select">
+                    @foreach (var currency in Model.Currencies)
+                    {
+                        <option value="@currency.Code" selected="@(string.Equals(currency.Code, defaultPriceCurrency, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">
+                            @currency.Code
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Мин. площадь (м²)</label>
+                <input type="number" name="minArea" class="form-control" min="0" step="0.1" value="@defaultMinArea.ToString("0.0", CultureInfo.InvariantCulture)" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Макс. площадь (м²)</label>
+                <input type="number" name="maxArea" class="form-control" min="0" step="0.1" value="@defaultMaxArea?.ToString("0.0", CultureInfo.InvariantCulture)" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Минимальное совпадение (%)</label>
+                <div class="d-flex gap-2">
+                    <input id="minMatchRange" type="range" class="form-range flex-grow-1" min="1" max="100" step="1" value="@defaultMatchPercent.ToString("0", CultureInfo.InvariantCulture)" />
+                    <input id="minMatchInput" type="number" name="minMatchPercentage" class="form-control" style="max-width: 100px;" min="1" max="100" step="1" value="@defaultMatchPercent.ToString("0", CultureInfo.InvariantCulture)" required />
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h3 class="h6 mb-0">Область поиска</h3>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="ignoreArea" name="ignoreArea" value="true" checked="@(defaultIgnoreArea ? "checked" : null)" />
+                        <input type="hidden" name="ignoreArea" value="false" />
+                        <label class="form-check-label" for="ignoreArea">Искать без выбранной области</label>
+                    </div>
+                </div>
+
+                <div class="input-group mb-2">
+                    <input type="text" id="mapSearchAddress" class="form-control" placeholder="Поиск места на карте (например: Бендеры)" />
+                    <button class="btn btn-outline-secondary" type="button" id="mapSearchButton">
+                        <i class="bi bi-search"></i> Найти
+                    </button>
+                </div>
+                <div id="mapSearchStatus" class="form-text mb-2 text-muted">Можно искать по адресу для быстрого перемещения по карте.</div>
+
+                <input type="hidden" id="selectedLatitude" name="latitude" value="@defaultLat.ToString("0.######", CultureInfo.InvariantCulture)" />
+                <input type="hidden" id="selectedLongitude" name="longitude" value="@defaultLng.ToString("0.######", CultureInfo.InvariantCulture)" />
+                <div id="requirementAreaMap" class="properties-map rounded-4 border" style="min-height: 320px;"></div>
+                <div class="d-flex flex-wrap justify-content-between mt-2 small text-muted">
+                    <span id="selectedAreaText">Центр: @defaultLat.ToString("0.####"), @defaultLng.ToString("0.####")</span>
+                    <span id="searchModeText">@(defaultIgnoreArea ? "Режим: без выбранной области" : "Режим: по выбранной области")</span>
+                </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-md-8">
+                        <label for="radiusRangeKm" class="form-label">Радиус поиска, км</label>
+                        <input id="radiusRangeKm" type="range" class="form-range" min="0.1" max="200" step="0.1" value="@defaultRadiusKm.ToString("0.0", CultureInfo.InvariantCulture)" />
+                    </div>
+                    <div class="col-md-4">
+                        <label for="radiusInputKm" class="form-label">Радиус, км</label>
+                        <input id="radiusInputKm" type="number" name="searchRadiusKm" class="form-control" min="0.1" max="200" step="0.1" value="@defaultRadiusKm.ToString("0.0", CultureInfo.InvariantCulture)" required />
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <h3 class="h6 mb-2">Критерии</h3>
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <div class="card h-100 border"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="fw-semibold">Обязательные</div>
+                                <button type="button" class="btn btn-outline-primary btn-sm js-add-criterion" data-priority="MustHave">Добавить</button>
+                            </div>
+                            <div id="criteriaMustHave" class="criteria-list"></div>
+                        </div></div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card h-100 border"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="fw-semibold">Важные</div>
+                                <button type="button" class="btn btn-outline-primary btn-sm js-add-criterion" data-priority="Important">Добавить</button>
+                            </div>
+                            <div id="criteriaImportant" class="criteria-list"></div>
+                        </div></div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card h-100 border"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="fw-semibold">Желательные</div>
+                                <button type="button" class="btn btn-outline-primary btn-sm js-add-criterion" data-priority="NiceToHave">Добавить</button>
+                            </div>
+                            <div id="criteriaNiceToHave" class="criteria-list"></div>
+                        </div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 d-flex flex-wrap gap-2">
+                @if (Model.CanManageRequirement)
+                {
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Сохранить подбор</button>
+                    <button type="submit" name="runAfterSave" value="true" class="btn btn-outline-primary">
+                        <i class="bi bi-play-fill me-1"></i> Запустить подбор
+                    </button>
+                }
+                else
+                {
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search me-1"></i> Найти недвижимость
+                    </button>
+                }
+            </div>
+        </form>
+    </div>
+</section>
+
+@if (Model.CanManageRequirement)
+{
+    <form asp-action="RunMatching" method="post" id="runMatchingForm" class="d-none">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="matchLimit" value="@Model.MatchLimit" />
+        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+    </form>
+}
+
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h4 mb-0">Результаты подбора</h2>
+            @if (Model.CanManageRequirement)
+            {
+                <form asp-action="Index" method="get" class="row g-2 align-items-center justify-content-end mb-0">
+                    <input type="hidden" name="run" value="true" />
+                    <div class="col-auto">
+                        <input type="number" name="matchLimit" class="form-control form-control-sm" min="1" max="100" style="max-width: 100px;" value="@Model.MatchLimit" />
+                    </div>
+                    <div class="col-auto">
+                        <select name="sortBy" class="form-select form-select-sm" style="max-width: 220px;">
+                            <option value="score" selected="@(Model.SortBy == "score" ? "selected" : null)">По совпадению (desc)</option>
+                            <option value="distance" selected="@(Model.SortBy == "distance" ? "selected" : null)">По дистанции (asc)</option>
+                            <option value="price" selected="@(Model.SortBy == "price" ? "selected" : null)">По цене (asc)</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">Применить</button>
+                    </div>
+                </form>
+            }
+        </div>
+
+        @if (requirement is null)
+        {
+            @if (Model.CanManageRequirement)
+            {
+                <div class="alert alert-light border mb-0">
+                    Активных подборов пока нет. Создайте новый подбор ниже.
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-light border mb-0">
+                    Заполните параметры ниже и запустите поиск.
+                </div>
+            }
+        }
+        else if (Model.RunAttempted && Model.MatchResults.Count == 0)
+        {
+            <div class="alert alert-warning mb-0">
+                @if (Model.CanManageRequirement)
+                {
+                    <text>По текущим условиям ничего не найдено. Можно смягчить фильтры или подписаться на уведомления.</text>
+                }
+                else
+                {
+                    <text>По текущим условиям ничего не найдено. Попробуйте смягчить фильтры.</text>
+                }
+            </div>
+        }
+        else if (Model.MatchResults.Count == 0)
+        {
+            @if (Model.CanManageRequirement)
+            {
+                <div class="alert alert-light border mb-0">Нажмите «Запустить подбор», чтобы получить совпадения.</div>
+            }
+            else
+            {
+                <div class="alert alert-light border mb-0">Задайте параметры и нажмите «Найти недвижимость».</div>
+            }
+        }
+        else
+        {
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <div class="small text-muted">Найдено вариантов: @Model.MatchResults.Count</div>
+            </div>
+            <div class="row g-3">
+                <div class="col-lg-6 col-xl-5">
+                    <div id="matchingMap" class="properties-map matching-results-map rounded-4 border"></div>
+                </div>
+                <div class="col-lg-6 col-xl-7">
+                    <div class="table-responsive" style="max-height: 360px; overflow-y: auto;">
+                        <table class="table table-sm align-middle mb-0 matching-results-table">
+                            <thead>
+                                <tr>
+                                    <th class="matching-object-cell">Объект</th>
+                                    <th class="matching-number-cell">Совпадение</th>
+                                    @if (!(requirement?.IgnoreArea ?? false))
+                                    {
+                                        <th class="matching-number-cell">Расстояние</th>
+                                    }
+                                    <th class="matching-price-cell">Цена</th>
+                                    <th class="matching-action-cell"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var item in Model.MatchResults)
+                            {
+                                var detailsUrl = Url.Action("Details", "Properties", new { id = item.PropertyId, returnUrl = detailsReturnUrl }) ?? "#";
+                                var showBasePrice = !string.Equals(item.OriginalPriceCurrency, CurrencyFormatter.GetClientSettings().BaseCurrencyCode, StringComparison.OrdinalIgnoreCase);
+                                var complaintUrl = Url.Action("Complaint", "DealCenter", new
+                                {
+                                    source = "matching",
+                                    propertyId = item.PropertyId,
+                                    returnUrl = $"{Context.Request.Path}{Context.Request.QueryString}"
+                                }) ?? "#";
+                                <tr class="js-match-row" data-property-id="@item.PropertyId">
+                                    <td class="matching-object-cell"><div class="fw-semibold">@item.Title</div><div class="small text-muted">@item.Address</div></td>
+                                    <td class="matching-number-cell">@((item.MatchScore * 100d).ToString("N0"))%</td>
+                                    @if (!(requirement?.IgnoreArea ?? false))
+                                    {
+                                        <td class="matching-number-cell">@((item.DistanceMeters / 1000d).ToString("N2")) км</td>
+                                    }
+                                    <td class="matching-price-cell">
+                                        <div>@CurrencyFormatter.Format(item.OriginalPriceAmount, item.OriginalPriceCurrency)</div>
+                                        @if (showBasePrice)
+                                        {
+                                            <div class="small text-muted">≈ @CurrencyFormatter.Format(item.Price)</div>
+                                        }
+                                    </td>
+                                    <td class="matching-action-cell">
+                                        <div class="matching-row-actions">
+                                            <button type="button" class="btn btn-outline-primary btn-sm js-show-on-map" data-property-id="@item.PropertyId">
+                                                <i class="bi bi-geo-alt me-1"></i> На карте
+                                            </button>
+                                            <a href="@detailsUrl" class="btn btn-primary btn-sm">
+                                                <i class="bi bi-box-arrow-up-right me-1"></i> Открыть объект
+                                            </a>
+                                            <a href="@complaintUrl" class="btn btn-link btn-sm text-secondary">
+                                                Не подходит
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</section>
+
+@if (Model.CanManageRequirement)
+{
+    <section class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-4">
+            <h2 class="h4 mb-3">Что уже отправлялось на email</h2>
+            @if (requirement is null)
+            {
+                <div class="alert alert-light border mb-0">История появится после создания и подписки на подбор.</div>
+            }
+            else if (Model.NotificationHistory.Count == 0)
+            {
+                <div class="alert alert-light border mb-0">Пока нет отправленных предложений.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Дата (UTC)</th><th>Объект</th><th>Цена</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var item in Model.NotificationHistory)
+                            {
+                                <tr>
+                                    <td>@item.SentAtUtc.ToString("dd.MM.yyyy HH:mm")</td>
+                                    <td>
+                                        <div class="mb-1">
+                                            <span class="badge bg-primary-subtle text-primary-emphasis border">@item.NotificationType</span>
+                                        </div>
+                                        @item.Title
+                                    </td>
+                                    <td>@CurrencyFormatter.Format(item.Price)</td>
+                                    <td><a asp-controller="Properties" asp-action="Details" asp-route-id="@item.PropertyId" class="btn btn-outline-secondary btn-sm">Открыть</a></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+<div class="modal fade" id="criterionPickerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить критерий</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="criterionSearchInput" class="form-control mb-3" placeholder="Поиск критерия..." />
+                <div class="mb-3">
+                    <label class="form-label" for="criterionCategoryFilter">Категория</label>
+                    <select id="criterionCategoryFilter" class="form-select">
+                        <option value="">Не важно</option>
+                    </select>
+                </div>
+                <div id="criterionPickerList" class="list-group"></div>
+                <nav class="mt-3" aria-label="Страницы критериев">
+                    <ul id="criterionPickerPagination" class="pagination pagination-sm mb-0 justify-content-center"></ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+}
+
+@section Scripts {
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="~/js/matching-page.js" asp-append-version="true"></script>
+    <script>
+        window.matchingPageInit(@Html.Raw(initJson));
+    </script>
+}

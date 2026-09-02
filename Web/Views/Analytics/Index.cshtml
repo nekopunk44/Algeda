@@ -1,0 +1,457 @@
+﻿@model Web.Models.Analytics.AnalyticsIndexViewModel
+@using Web.Models.Analytics
+@using Web.Models.Dashboard
+@inject Web.Services.ICurrencyFormatter CurrencyFormatter
+@{
+    ViewData["Title"] = "Аналитика";
+
+    static string SourceLabel(string? source) => source?.Trim() switch
+    {
+        "Sale" => "Продажа",
+        "Purchase" => "Покупка",
+        "Manual" => "Ручной ввод",
+        _ => string.IsNullOrWhiteSpace(source) ? "Не указано" : source
+    };
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Аналитика</h1>
+        <a asp-action="ExportPdf"
+           asp-route-tab="@Model.ActiveTab"
+           asp-route-dateFrom="@Model.Filters.DateFrom?.ToString("yyyy-MM-dd")"
+           asp-route-dateTo="@Model.Filters.DateTo?.ToString("yyyy-MM-dd")"
+           asp-route-dealType="@Model.Filters.DealType"
+           asp-route-source="@Model.Filters.Source"
+           asp-route-realtorId="@Model.Realtors.SelectedRealtorId"
+           class="btn btn-outline-primary btn-sm">
+            Скачать PDF
+        </a>
+    </div>
+</section>
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <ul class="nav nav-pills gap-2 mb-3">
+            <li class="nav-item">
+                <a class="nav-link @(Model.ActiveTab == AnalyticsTabs.Realtors ? "active" : null)"
+                   asp-action="Index"
+                   asp-route-tab="@AnalyticsTabs.Realtors"
+                   asp-route-dateFrom="@Model.Filters.DateFrom?.ToString("yyyy-MM-dd")"
+                   asp-route-dateTo="@Model.Filters.DateTo?.ToString("yyyy-MM-dd")"
+                   asp-route-dealType="@Model.Filters.DealType"
+                   asp-route-source="@Model.Filters.Source"
+                   asp-route-realtorId="@Model.Realtors.SelectedRealtorId">
+                    Риелторы
+                </a>
+            </li>
+            @if (Model.IsAdmin)
+            {
+                <li class="nav-item">
+                    <a class="nav-link @(Model.ActiveTab == AnalyticsTabs.Agency ? "active" : null)"
+                       asp-action="Index"
+                       asp-route-tab="@AnalyticsTabs.Agency"
+                       asp-route-dateFrom="@Model.Filters.DateFrom?.ToString("yyyy-MM-dd")"
+                       asp-route-dateTo="@Model.Filters.DateTo?.ToString("yyyy-MM-dd")"
+                       asp-route-dealType="@Model.Filters.DealType"
+                       asp-route-source="@Model.Filters.Source"
+                       asp-route-realtorId="@Model.Realtors.SelectedRealtorId">
+                        Агентство
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(Model.ActiveTab == AnalyticsTabs.Properties ? "active" : null)"
+                       asp-action="Index"
+                       asp-route-tab="@AnalyticsTabs.Properties"
+                       asp-route-dateFrom="@Model.Filters.DateFrom?.ToString("yyyy-MM-dd")"
+                       asp-route-dateTo="@Model.Filters.DateTo?.ToString("yyyy-MM-dd")"
+                       asp-route-dealType="@Model.Filters.DealType"
+                       asp-route-source="@Model.Filters.Source"
+                       asp-route-realtorId="@Model.Realtors.SelectedRealtorId">
+                        Объекты
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(Model.ActiveTab == AnalyticsTabs.Quality ? "active" : null)"
+                       asp-action="Index"
+                       asp-route-tab="@AnalyticsTabs.Quality"
+                       asp-route-dateFrom="@Model.Filters.DateFrom?.ToString("yyyy-MM-dd")"
+                       asp-route-dateTo="@Model.Filters.DateTo?.ToString("yyyy-MM-dd")"
+                       asp-route-dealType="@Model.Filters.DealType"
+                       asp-route-source="@Model.Filters.Source"
+                       asp-route-realtorId="@Model.Realtors.SelectedRealtorId">
+                        Жалобы и качество
+                    </a>
+                </li>
+            }
+        </ul>
+
+        <form asp-action="Index" method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="tab" value="@Model.ActiveTab" />
+            <input type="hidden" name="realtorId" value="@Model.Realtors.SelectedRealtorId" />
+            <div class="col-md-2">
+                <label class="form-label">С даты</label>
+                <input type="date" name="dateFrom" class="form-control" value="@Model.Filters.DateFrom?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">По дату</label>
+                <input type="date" name="dateTo" class="form-control" value="@Model.Filters.DateTo?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Тип сделки</label>
+                <select name="dealType" class="form-select">
+                    <option value="all" selected="@(Model.Filters.DealType == "all" ? "selected" : null)">Все</option>
+                    <option value="purchase" selected="@(Model.Filters.DealType == "purchase" ? "selected" : null)">Покупка</option>
+                    <option value="sale" selected="@(Model.Filters.DealType == "sale" ? "selected" : null)">Продажа</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Источник</label>
+                <select name="source" class="form-select">
+                    <option value="all" selected="@(Model.Filters.Source == "all" ? "selected" : null)">Все источники</option>
+                    @foreach (var item in Model.Filters.AvailableSources)
+                    {
+                        <option value="@item" selected="@(string.Equals(Model.Filters.Source, item, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@SourceLabel(item)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-primary w-100">Применить</button>
+                <a asp-action="Index" asp-route-tab="@Model.ActiveTab" class="btn btn-outline-secondary w-100">Сброс</a>
+            </div>
+        </form>
+
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            @{
+                var today = DateTime.Today;
+                var ranges = new[] { 7, 30, 90, 365 };
+            }
+            @foreach (var days in ranges)
+            {
+                var rangeFrom = today.AddDays(-(days - 1));
+                <a asp-action="Index"
+                   asp-route-tab="@Model.ActiveTab"
+                   asp-route-dateFrom="@rangeFrom.ToString("yyyy-MM-dd")"
+                   asp-route-dateTo="@today.ToString("yyyy-MM-dd")"
+                   asp-route-dealType="@Model.Filters.DealType"
+                   asp-route-source="@Model.Filters.Source"
+                   asp-route-realtorId="@Model.Realtors.SelectedRealtorId"
+                   class="btn btn-sm btn-outline-secondary">
+                    @days дн
+                </a>
+            }
+        </div>
+    </div>
+</section>
+
+@if (Model.ActiveTab == AnalyticsTabs.Realtors)
+{
+    <section class="card border-0 shadow-sm">
+        <div class="card-body">
+            @if (Model.IsAdmin)
+            {
+                <form asp-action="Index" method="get" class="row g-2 align-items-end rounded-3 border bg-light p-3 mb-3">
+                    <input type="hidden" name="tab" value="@Model.ActiveTab" />
+                    <input type="hidden" name="dateFrom" value="@Model.Filters.DateFrom?.ToString("yyyy-MM-dd")" />
+                    <input type="hidden" name="dateTo" value="@Model.Filters.DateTo?.ToString("yyyy-MM-dd")" />
+                    <input type="hidden" name="dealType" value="@Model.Filters.DealType" />
+                    <input type="hidden" name="source" value="@Model.Filters.Source" />
+                    <div class="col-md-5">
+                        <label class="form-label">Поиск риелтора</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="search"
+                                   class="form-control"
+                                   data-realtor-select-search
+                                   placeholder="ФИО, телефон, почта или ID"
+                                   autocomplete="off" />
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Риелтор</label>
+                        <select name="realtorId" class="form-select" data-realtor-select required>
+                            @foreach (var realtor in Model.Realtors.Realtors)
+                            {
+                                var optionSearch = string.Join(" ", new[]
+                                {
+                                    realtor.FullName,
+                                    realtor.LastName,
+                                    realtor.FirstName,
+                                    realtor.MiddleName,
+                                    realtor.PhoneNumber,
+                                    realtor.Email,
+                                    realtor.Id.ToString()
+                                }.Where(x => !string.IsNullOrWhiteSpace(x)));
+                                <option value="@realtor.Id"
+                                        data-search="@optionSearch"
+                                        selected="@(Model.Realtors.SelectedRealtorId == realtor.Id ? "selected" : null)">
+                                    @realtor.FullName
+                                </option>
+                            }
+                        </select>
+                        <div class="form-text" data-realtor-select-empty hidden>Поиск не нашел риелторов.</div>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-outline-primary w-100">Показать</button>
+                    </div>
+                </form>
+            }
+
+            @if (Model.Realtors.LatestScore is null)
+            {
+                <div class="alert alert-light border mb-0">Данные по эффективности пока отсутствуют.</div>
+            }
+            else
+            {
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 h-100">
+                            <div class="small text-muted">CTS</div>
+                            <div class="display-6">@Model.Realtors.LatestScore.ClientTrustScore.ToString("F2")</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 h-100">
+                            <div class="small text-muted">APS</div>
+                            <div class="display-6">@Model.Realtors.LatestScore.AdminPerformanceScore.ToString("F2")</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-6">
+                        <div class="border rounded p-3 h-100">
+                            <div class="fw-semibold mb-2">Детализация CTS</div>
+                            <div class="small d-flex justify-content-between"><span>Сервис клиента</span><strong>@Model.Realtors.LatestScore.ClientTrustBreakdown.ClientServiceScoreComponent.ToString("F2")</strong></div>
+                            <div class="small d-flex justify-content-between"><span>Штраф по жалобам</span><strong>@Model.Realtors.LatestScore.ClientTrustBreakdown.ComplaintPenaltyComponent.ToString("F2")</strong></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="border rounded p-3 h-100">
+                            <div class="fw-semibold mb-2">Детализация APS</div>
+                            <div class="small d-flex justify-content-between"><span>Качество карточек</span><strong>@Model.Realtors.LatestScore.AdminPerformanceBreakdown.PropertyDataQualityComponent.ToString("F2")</strong></div>
+                            <div class="small d-flex justify-content-between"><span>Дисциплина</span><strong>@Model.Realtors.LatestScore.AdminPerformanceBreakdown.WorkflowDisciplineComponent.ToString("F2")</strong></div>
+                            <div class="small d-flex justify-content-between"><span>Результативность</span><strong>@Model.Realtors.LatestScore.AdminPerformanceBreakdown.BusinessResultComponent.ToString("F2")</strong></div>
+                            <div class="small d-flex justify-content-between"><span>Репутационные риски</span><strong>@Model.Realtors.LatestScore.AdminPerformanceBreakdown.ReputationRiskComponent.ToString("F2")</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>CTS</th>
+                                <th>APS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.Realtors.ScoreHistory.OrderByDescending(x => x.CreatedDate))
+                            {
+                                <tr>
+                                    <td>@row.CreatedDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                                    <td>@row.ClientTrustScore.ToString("F2")</td>
+                                    <td>@row.AdminPerformanceScore.ToString("F2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+}
+else if (Model.ActiveTab == AnalyticsTabs.Agency)
+{
+    <section class="card border-0 shadow-sm">
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Всего сделок</div><div class="h4 mb-0">@Model.Agency.TotalDeals</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Завершено</div><div class="h4 mb-0">@Model.Agency.CompletedDeals</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Отменено</div><div class="h4 mb-0">@Model.Agency.CancelledDeals</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Конверсия</div><div class="h4 mb-0">@Model.Agency.ConversionRate.ToString("F2")%</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Комиссия агентства</div><div class="h4 mb-0">@CurrencyFormatter.Format(Model.Agency.TotalCommissionUsd)</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Выплаты риелторам</div><div class="h4 mb-0">@CurrencyFormatter.Format(Model.Agency.RealtorPayoutUsd)</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Чистый доход</div><div class="h4 mb-0">@CurrencyFormatter.Format(Model.Agency.AgencyNetCommissionUsd)</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Средний срок сделки (дни)</div><div class="h4 mb-0">@Model.Agency.AverageDealDurationDays.ToString("F2")</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Подтвержденные жалобы</div><div class="h4 mb-0">@Model.Agency.ConfirmedOrPartiallyConfirmedComplaints</div></div></div>
+            </div>
+
+            <div class="fw-semibold mb-2">Динамика завершенных сделок</div>
+            @if (Model.Agency.MonthlyCompletedDeals.Count == 0)
+            {
+                <div class="alert alert-light border mb-0">Недостаточно данных для графика.</div>
+            }
+            else
+            {
+                var maxValue = Math.Max(1, Model.Agency.MonthlyCompletedDeals.Max(x => x.Value));
+                <div class="d-grid gap-2">
+                    @foreach (var point in Model.Agency.MonthlyCompletedDeals)
+                    {
+                        var width = point.Value * 100 / maxValue;
+                        <div>
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>@point.Label</span>
+                                <strong>@point.Value</strong>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar" role="progressbar" style="width: @width%;"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}
+else if (Model.ActiveTab == AnalyticsTabs.Properties)
+{
+    <section class="card border-0 shadow-sm">
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Продано объектов</div><div class="h4 mb-0">@Model.Properties.SoldObjectsCount</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Средняя цена</div><div class="h4 mb-0">@CurrencyFormatter.Format(Model.Properties.AverageSoldPriceUsd)</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Медианная цена</div><div class="h4 mb-0">@CurrencyFormatter.Format(Model.Properties.MedianSoldPriceUsd)</div></div></div>
+                <div class="col-md-6"><div class="border rounded p-3"><div class="small text-muted">Средняя скорость продажи (дни)</div><div class="h4 mb-0">@Model.Properties.AverageSaleDurationDays.ToString("F2")</div></div></div>
+                <div class="col-md-6"><div class="border rounded p-3"><div class="small text-muted">Среднее качество карточки</div><div class="h4 mb-0">@Model.Properties.AverageCardQualityScore.ToString("F2") / 5</div></div></div>
+            </div>
+
+            <div class="fw-semibold mb-2">Продано по типам</div>
+            @if (Model.Properties.SoldByType.Count == 0)
+            {
+                <div class="alert alert-light border mb-0">Данные отсутствуют.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr><th>Тип</th><th>Кол-во</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.Properties.SoldByType)
+                            {
+                                <tr>
+                                    <td>@row.Name</td>
+                                    <td>@row.Count</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+}
+else
+{
+    <section class="card border-0 shadow-sm">
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Открытые</div><div class="h4 mb-0">@Model.Quality.OpenComplaints</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">В работе</div><div class="h4 mb-0">@Model.Quality.InProgressComplaints</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Решенные</div><div class="h4 mb-0">@Model.Quality.ResolvedComplaints</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Подтверждено</div><div class="h4 mb-0">@Model.Quality.ConfirmedComplaints</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Частично</div><div class="h4 mb-0">@Model.Quality.PartiallyConfirmedComplaints</div></div></div>
+                <div class="col-md-4"><div class="border rounded p-3"><div class="small text-muted">Не подтверждено</div><div class="h4 mb-0">@Model.Quality.NotConfirmedComplaints</div></div></div>
+            </div>
+
+            <div class="fw-semibold mb-2">Категории жалоб</div>
+            @if (Model.Quality.ComplaintsByCategory.Count == 0)
+            {
+                <div class="alert alert-light border mb-0">Данные отсутствуют.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr><th>Категория</th><th>Кол-во</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.Quality.ComplaintsByCategory)
+                            {
+                                <tr>
+                                    <td>@DashboardValueDisplay.ComplaintCategory(row.Name)</td>
+                                    <td>@row.Count</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@section Scripts {
+    <script>
+        (() => {
+            const searchInput = document.querySelector("[data-realtor-select-search]");
+            const select = document.querySelector("[data-realtor-select]");
+            const emptyHint = document.querySelector("[data-realtor-select-empty]");
+
+            if (!searchInput || !select) {
+                return;
+            }
+
+            const onlyDigits = (value) => String(value || "").replace(/\D/g, "");
+            const normalize = (value) => String(value || "").trim().toLowerCase();
+
+            const matches = (option, query) => {
+                if (!query) {
+                    return true;
+                }
+
+                const text = normalize(`${option.textContent || ""} ${option.dataset.search || ""}`);
+                const textDigits = onlyDigits(text);
+                const tokens = query.split(/\s+/).filter(Boolean);
+
+                return tokens.every((token) => {
+                    if (text.includes(token)) {
+                        return true;
+                    }
+
+                    const tokenDigits = onlyDigits(token);
+                    return tokenDigits.length > 0 && textDigits.includes(tokenDigits);
+                });
+            };
+
+            const applyFilter = () => {
+                const query = normalize(searchInput.value);
+                let firstVisible = null;
+                let selectedVisible = false;
+
+                Array.from(select.options).forEach((option) => {
+                    const isVisible = matches(option, query);
+                    option.hidden = !isVisible;
+
+                    if (isVisible) {
+                        firstVisible ??= option;
+                    }
+
+                    if (option.selected && isVisible) {
+                        selectedVisible = true;
+                    }
+                });
+
+                if (!selectedVisible && firstVisible) {
+                    select.value = firstVisible.value;
+                }
+
+                if (emptyHint) {
+                    emptyHint.hidden = firstVisible !== null;
+                }
+            };
+
+            searchInput.addEventListener("input", applyFilter);
+            applyFilter();
+        })();
+    </script>
+}

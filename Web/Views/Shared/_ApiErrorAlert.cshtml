@@ -1,0 +1,9 @@
+@model Web.Models.Api.ApiErrorViewModel
+@{
+    var alertClass = Model.StatusCode is 401 or 403 ? "alert-warning" : "alert-danger";
+}
+
+<div class="alert @alertClass" role="alert">
+    <div class="fw-semibold mb-1">@Model.Title</div>
+    <div>@Model.Message</div>
+</div>

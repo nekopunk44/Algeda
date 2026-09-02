@@ -1,0 +1,111 @@
+﻿@model Web.Models.SellProperty.SellPropertyIndexViewModel
+@using Web.Models.DealRequests
+@{
+    ViewData["Title"] = "Продать недвижимость";
+    var statuses = new[] { "Created", "InProgress", "Completed", "Cancelled" };
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Продать недвижимость</h1>
+        <a asp-action="Create" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-circle me-1"></i>Новая заявка
+        </a>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-4">
+        <form asp-action="Index" method="get" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label">Поиск</label>
+                <input type="text"
+                       name="search"
+                       class="form-control"
+                       value="@Model.Search"
+                       placeholder="Комментарий, адрес, статус" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Статус</label>
+                <select name="status" class="form-select">
+                    <option value="">Все</option>
+                    @foreach (var status in statuses)
+                    {
+                        <option value="@status" selected="@(string.Equals(Model.Status, status, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">
+                            @DealRequestValueDisplay.Status(status)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-primary w-100">Применить</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Сброс</a>
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        @if (Model.Items.Count == 0)
+        {
+            <div class="alert alert-light border mb-0">Заявок на продажу пока нет.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>Объект</th>
+                        <th>Статус</th>
+                        <th>Дата</th>
+                        <th>Комментарий</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@(string.IsNullOrWhiteSpace(item.PropertyTitle) ? "Объект в обработке" : item.PropertyTitle)</div>
+                            </td>
+                            <td>
+                                <span class="badge rounded-pill @DealRequestValueDisplay.StatusBadgeClass(item.Status)">
+                                    @DealRequestValueDisplay.Status(item.Status)
+                                </span>
+                            </td>
+                            <td class="text-nowrap">@item.CreatedDate.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td class="text-break">@(string.IsNullOrWhiteSpace(item.RequestMessage) ? "—" : item.RequestMessage)</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-outline-primary btn-sm">Открыть</a>
+                                    @if (string.Equals(item.Status, "Created", StringComparison.OrdinalIgnoreCase)
+                                         || string.Equals(item.Status, "InProgress", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <form asp-action="Cancel" asp-route-id="@item.Id" method="post" class="m-0" onsubmit="return confirm('Отменить заявку на продажу?');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">Отменить</button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>

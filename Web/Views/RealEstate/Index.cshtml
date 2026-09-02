@@ -1,0 +1,351 @@
+@model Web.Models.RealEstate.RealEstateIndexViewModel
+@using System.Text.Json
+@using Web.Models.Properties
+@inject Web.Services.ICurrencyFormatter CurrencyFormatter
+@{
+    ViewData["Title"] = "Недвижимость";
+    var pricingSettings = CurrencyFormatter.GetClientSettings();
+    var baseCurrencyCode = pricingSettings.BaseCurrencyCode;
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Недвижимость</h1>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i> Добавить объект
+        </a>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-4">
+        <form asp-action="Index" method="get" class="row g-2 align-items-end">
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label">Поиск по объекту</label>
+                <input type="text" name="search" class="form-control" value="@Model.Filters.Search" placeholder="Название или адрес" />
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label">Поиск по продавцу</label>
+                <input type="text" name="sellerSearch" class="form-control" value="@Model.Filters.SellerSearch" placeholder="ФИО, телефон или email" />
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label">Фильтр по критериям</label>
+                <input type="text" name="criterionSearch" class="form-control" value="@Model.Filters.CriterionSearch" placeholder="Код / название / категория" />
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label">Тип</label>
+                <select name="type" class="form-select">
+                    <option value="">Все</option>
+                    @foreach (var item in Model.AvailableTypes)
+                    {
+                        <option value="@item" selected="@(string.Equals(item, Model.Filters.Type, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">
+                            @PropertyValueDisplay.Type(item)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-3">
+                <label class="form-label">Статус</label>
+                <select name="status" class="form-select">
+                    <option value="">Все</option>
+                    @foreach (var item in Model.AvailableStatuses)
+                    {
+                        <option value="@item" selected="@(string.Equals(item, Model.Filters.Status, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">
+                            @PropertyValueDisplay.Status(item)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-3">
+                <label class="form-label">Цена от</label>
+                <input type="number" name="minPrice" class="form-control" min="0" value="@Model.Filters.MinPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+            </div>
+            <div class="col-lg-2 col-md-3">
+                <label class="form-label">Цена до</label>
+                <input type="number" name="maxPrice" class="form-control" min="0" value="@Model.Filters.MaxPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+            </div>
+            <div class="col-lg-2 col-md-3">
+                <label class="form-label">Валюта цены</label>
+                <select name="priceCurrency" class="form-select">
+                    @foreach (var currency in Model.Currencies)
+                    {
+                        <option value="@currency.Code" selected="@(string.Equals(currency.Code, Model.Filters.PriceCurrency, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">
+                            @currency.Code
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-3">
+                <label class="form-label">На стр.</label>
+                <select name="pageSize" class="form-select">
+                    @foreach (var size in new[] { 10, 20, 50, 100 })
+                    {
+                        <option value="@size" selected="@(size == Model.Filters.PageSize ? "selected" : null)">@size</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Применить фильтры</button>
+                <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Сбросить</a>
+                <span class="ms-auto text-muted small align-self-center">Найдено: @Model.TotalCount</span>
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        @if (Model.Items.Count == 0)
+        {
+            <div class="alert alert-light border mb-0">По заданным фильтрам объекты не найдены.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Объект</th>
+                            <th>Тип</th>
+                            <th>Статус</th>
+                            <th>Цена</th>
+                            <th>Площадь</th>
+                            <th>Комнат</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Items)
+                        {
+                            var photoPaths = item.PhotoPaths.Count > 0
+                                ? item.PhotoPaths.ToList()
+                                : (!string.IsNullOrWhiteSpace(item.MainPhotoPath)
+                                    ? new List<string> { item.MainPhotoPath }
+                                    : new List<string>());
+                            var firstPhoto = photoPaths.FirstOrDefault();
+                            var photoJson = JsonSerializer.Serialize(photoPaths);
+
+                            <tr>
+                                <td style="min-width: 330px;">
+                                    <div class="d-flex gap-3 align-items-start">
+                                        @if (!string.IsNullOrWhiteSpace(firstPhoto))
+                                        {
+                                            <button type="button"
+                                                    class="btn p-0 border-0 bg-transparent js-open-photo-viewer"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#propertyPhotosModal"
+                                                    data-property-title="@item.Title"
+                                                    data-photo-paths="@photoJson"
+                                                    title="Открыть фотографии">
+                                                <img src="@firstPhoto" alt="Фото объекта" class="rounded border" style="width: 112px; height: 84px; object-fit: cover;" />
+                                            </button>
+                                        }
+                                        <div>
+                                            <div class="fw-semibold">@item.Title</div>
+                                            <div class="small text-muted">@item.Address</div>
+                                            <div class="small text-muted mt-1">
+                                                Продавец: @(string.IsNullOrWhiteSpace(item.OwnerFullName) ? "—" : item.OwnerFullName)
+                                            </div>
+                                            <div class="small text-muted">
+                                                @(string.IsNullOrWhiteSpace(item.OwnerPhoneNumber) ? "—" : item.OwnerPhoneNumber)
+                                                @if (!string.IsNullOrWhiteSpace(item.OwnerEmail))
+                                                {
+                                                    <text> | @item.OwnerEmail</text>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>@PropertyValueDisplay.Type(item.Type)</td>
+                                <td>
+                                    <div>@PropertyValueDisplay.Status(item.Status)</div>
+                                    @if (item.SoldAtUtc.HasValue)
+                                    {
+                                        <div class="small text-muted">Продано: @item.SoldAtUtc.Value.ToString("dd.MM.yyyy")</div>
+                                    }
+                                </td>
+                                <td>
+                                    <div>@CurrencyFormatter.Format(item.OriginalPriceAmount, item.OriginalPriceCurrency)</div>
+                                    @if (!string.Equals(item.OriginalPriceCurrency, baseCurrencyCode, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <div class="small text-muted">≈ @CurrencyFormatter.Format(item.Price)</div>
+                                    }
+                                </td>
+                                <td>@item.Area.ToString("N1") м²</td>
+                                <td>@item.RoomsCount</td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-outline-primary btn-sm">Редактировать</a>
+
+                                        @if (!string.Equals(item.Status, "Sold", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <form asp-action="MarkAsSold" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="propertyId" value="@item.Id" />
+                                                <button type="submit" class="btn btn-outline-warning btn-sm">Продан</button>
+                                            </form>
+                                        }
+
+                                        @if (string.Equals(item.Status, "Sold", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <form asp-action="Show" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="propertyId" value="@item.Id" />
+                                                <button type="submit" class="btn btn-outline-success btn-sm">Активировать</button>
+                                            </form>
+                                        }
+
+                                        @if (string.Equals(item.Status, "Hidden", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <form asp-action="Show" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="propertyId" value="@item.Id" />
+                                                <button type="submit" class="btn btn-outline-success btn-sm">Показать</button>
+                                            </form>
+                                        }
+                                        else if (!string.Equals(item.Status, "Sold", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <form asp-action="Hide" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="propertyId" value="@item.Id" />
+                                                <button type="submit" class="btn btn-outline-dark btn-sm">Скрыть</button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPages > 1)
+            {
+                <nav class="mt-3" aria-label="Пагинация объектов">
+                    <ul class="pagination pagination-sm mb-0">
+                        @for (var p = 1; p <= Model.TotalPages; p++)
+                        {
+                            <li class="page-item @(p == Model.Filters.Page ? "active" : null)">
+                                <a class="page-link"
+                                   asp-action="Index"
+                                   asp-route-page="@p"
+                                   asp-route-pageSize="@Model.Filters.PageSize"
+                                   asp-route-search="@Model.Filters.Search"
+                                   asp-route-sellerSearch="@Model.Filters.SellerSearch"
+                                   asp-route-criterionSearch="@Model.Filters.CriterionSearch"
+                                   asp-route-type="@Model.Filters.Type"
+                                   asp-route-status="@Model.Filters.Status"
+                                   asp-route-minPrice="@Model.Filters.MinPrice"
+                                   asp-route-maxPrice="@Model.Filters.MaxPrice"
+                                   asp-route-priceCurrency="@Model.Filters.PriceCurrency">@p</a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            }
+        }
+    </div>
+</section>
+
+<div class="modal fade" id="propertyPhotosModal" tabindex="-1" aria-labelledby="propertyPhotosModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="propertyPhotosModalLabel">Фотографии объекта</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div id="propertyPhotosCarousel" class="carousel slide" data-bs-ride="false">
+                    <div id="propertyPhotosCarouselInner" class="carousel-inner"></div>
+                    <button id="propertyPhotosPrev" class="carousel-control-prev" type="button" data-bs-target="#propertyPhotosCarousel" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Предыдущее</span>
+                    </button>
+                    <button id="propertyPhotosNext" class="carousel-control-next" type="button" data-bs-target="#propertyPhotosCarousel" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Следующее</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const viewerButtons = document.querySelectorAll(".js-open-photo-viewer");
+            const titleElement = document.getElementById("propertyPhotosModalLabel");
+            const carouselInner = document.getElementById("propertyPhotosCarouselInner");
+            const prevButton = document.getElementById("propertyPhotosPrev");
+            const nextButton = document.getElementById("propertyPhotosNext");
+
+            if (!titleElement || !carouselInner || !prevButton || !nextButton || viewerButtons.length === 0) {
+                return;
+            }
+
+            viewerButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    if (!(button instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const propertyTitle = button.dataset.propertyTitle || "Фотографии объекта";
+                    const raw = button.dataset.photoPaths || "[]";
+
+                    let photos = [];
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed)) {
+                            photos = parsed.filter((x) => typeof x === "string" && x.trim().length > 0);
+                        }
+                    } catch {
+                        photos = [];
+                    }
+
+                    titleElement.textContent = propertyTitle;
+
+                    if (photos.length === 0) {
+                        carouselInner.innerHTML = `
+                            <div class="carousel-item active">
+                                <div class="text-center text-muted py-5">Фотографии отсутствуют.</div>
+                            </div>
+                        `;
+                        prevButton.classList.add("d-none");
+                        nextButton.classList.add("d-none");
+                        return;
+                    }
+
+                    carouselInner.innerHTML = photos.map((path, index) => `
+                        <div class="carousel-item ${index === 0 ? "active" : ""}">
+                            <img src="${escapeHtml(path)}" class="d-block w-100 rounded" style="max-height: 72vh; object-fit: contain;" alt="Фото объекта" />
+                        </div>
+                    `).join("");
+
+                    const controlsVisible = photos.length > 1;
+                    prevButton.classList.toggle("d-none", !controlsVisible);
+                    nextButton.classList.toggle("d-none", !controlsVisible);
+                });
+            });
+
+            function escapeHtml(value) {
+                return String(value || "")
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll("\"", "&quot;")
+                    .replaceAll("'", "&#39;");
+            }
+        })();
+    </script>
+}

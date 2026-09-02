@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "ms-dotnettools.csdevkit",
+    "ms-dotnettools.csharp",
+    "dart-code.flutter",
+    "dart-code.dart-code"
+  ]
+}

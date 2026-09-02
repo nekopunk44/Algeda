@@ -1,0 +1,297 @@
+@model Web.Models.RealEstate.RealEstateCreateViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Добавить объект";
+
+    var initJson = JsonSerializer.Serialize(new
+    {
+        criteriaDefinitions = Model.CriterionDefinitions.Select(x => new
+        {
+            id = x.Id,
+            code = x.Code,
+            displayName = x.DisplayName,
+            category = x.Category,
+            description = x.Description,
+            valueType = x.ValueType,
+            options = x.Options
+                .OrderBy(o => o.SortOrder)
+                .ThenBy(o => o.Label)
+                .Select(o => new { value = o.Value, label = o.Label })
+        }),
+        latitude = Model.Form.Latitude,
+        longitude = Model.Form.Longitude
+    });
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Добавить объект недвижимости</h1>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">К списку</a>
+    </div>
+</section>
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+<section class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <form asp-action="Create" method="post" enctype="multipart/form-data" id="realEstateCreateForm" class="row g-3" data-explicit-submit="true">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="criteriaJson" name="criteriaJson" />
+
+            <div class="col-lg-7">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label">Заголовок</label>
+                        <input type="text" name="title" class="form-control" value="@Model.Form.Title" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Тип</label>
+                        <select name="type" class="form-select" required>
+                            <option value="Apartment" selected="@(Model.Form.Type == "Apartment" ? "selected" : null)">Квартира</option>
+                            <option value="House" selected="@(Model.Form.Type == "House" ? "selected" : null)">Дом</option>
+                            <option value="Commercial" selected="@(Model.Form.Type == "Commercial" ? "selected" : null)">Коммерция</option>
+                            <option value="Land" selected="@(Model.Form.Type == "Land" ? "selected" : null)">Участок</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Адрес</label>
+                        <div class="input-group">
+                            <input type="text" id="addressInput" name="address" class="form-control" value="@Model.Form.Address" required />
+                            <button type="button" id="searchAddressButton" class="btn btn-outline-secondary">Найти на карте</button>
+                        </div>
+                        <div class="form-text" id="mapStatusText">Выберите точку на карте или введите адрес.</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Широта</label>
+                        <input type="number" id="latitudeInput" name="latitude" step="0.000001" class="form-control" value="@Model.Form.Latitude.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)" required />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Долгота</label>
+                        <input type="number" id="longitudeInput" name="longitude" step="0.000001" class="form-control" value="@Model.Form.Longitude.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)" required />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Цена (исходная)</label>
+                        <input type="number" name="price" min="1" step="1" class="form-control" value="@Model.Form.Price.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Валюта</label>
+                        <select name="priceCurrency" class="form-select" required>
+                            @if (Model.Currencies.Count == 0)
+                            {
+                                <option value="USD" selected>USD</option>
+                            }
+                            else
+                            {
+                                foreach (var currency in Model.Currencies.Where(x => x.IsActive).OrderBy(x => x.Code))
+                                {
+                                    <option value="@currency.Code" selected="@(currency.Code == Model.Form.PriceCurrency ? "selected" : null)">
+                                        @currency.Code (@currency.Symbol)
+                                    </option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Площадь, м²</label>
+                        <input type="number" name="area" min="1" step="0.1" class="form-control" value="@Model.Form.Area.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Комнат</label>
+                        <input type="number" name="roomsCount" min="1" class="form-control" value="@Model.Form.RoomsCount" required />
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="unregisteredOwnerToggle">
+                            <label class="form-check-label" for="unregisteredOwnerToggle">Собственник не зарегистрирован (ввести вручную)</label>
+                        </div>
+                    </div>
+
+                    <!-- Client Selection -->
+                    <div class="col-12" id="registeredOwnerContainer">
+                        <label class="form-label">Собственник (Клиент)</label>
+                        <div class="input-group">
+                            <input type="hidden" name="ownerClientId" id="ownerClientIdInput" value="@Model.Form.OwnerClientId" />
+                            <input type="text" id="ownerClientNameDisplay" class="form-control" value="@(Model.Form.OwnerClientId != null ? string.Join(" | ", new[] { Model.Form.OwnerFullName, Model.Form.OwnerEmail, Model.Form.OwnerPhoneNumber }.Where(s => !string.IsNullOrWhiteSpace(s))) : "Не выбран")" readonly />
+                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#clientSearchModal">Выбрать клиента</button>
+                        </div>
+                    </div>
+
+                    <!-- Manual Input -->
+                    <div class="row g-3 d-none mt-2" id="unregisteredOwnerContainer">
+                        <div class="col-md-4">
+                            <label class="form-label">ФИО собственника</label>
+                            <input type="text" id="manualOwnerFullName" name="ownerFullName" class="form-control" value="@Model.Form.OwnerFullName" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Email собственника</label>
+                            <input type="email" id="manualOwnerEmail" name="ownerEmail" class="form-control" value="@Model.Form.OwnerEmail" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Телефон собственника</label>
+                            <input type="text" id="manualOwnerPhoneNumber" name="ownerPhoneNumber" class="form-control" value="@Model.Form.OwnerPhoneNumber" />
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Фото объекта (до 20 файлов)</label>
+                        <input type="file" name="photos" class="form-control" accept=".jpg,.jpeg,.png,.webp" multiple />
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <label class="form-label">Позиция на карте</label>
+                <div id="propertyMap" class="rounded border" style="min-height: 380px;"></div>
+            </div>
+
+            <div class="col-12">
+                <hr class="my-1" />
+                <h2 class="h5 mt-2 mb-3">Критерии объекта</h2>
+                <div class="row g-3">
+                    <div class="col-lg-8">
+                        <label class="form-label">Критерий</label>
+                        <div class="input-group">
+                            <input type="text" id="criterionSelectedName" class="form-control" value="Критерий не выбран" readonly />
+                            <button type="button" id="criterionOpenPickerButton" class="btn btn-outline-secondary">Выбрать</button>
+                        </div>
+                        <select id="criterionDefinitionSelect" class="d-none">
+                            <option value="">Выберите критерий</option>
+                            @foreach (var criterion in Model.CriterionDefinitions.OrderBy(x => x.DisplayName))
+                            {
+                                <option value="@criterion.Id">@criterion.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <div id="criterionEditor" class="border rounded p-3 bg-light-subtle">
+                            <span class="text-muted small">После выбора критерия появится поле ввода значения.</span>
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="button" id="addCriterionButton" class="btn btn-outline-primary">Добавить критерий</button>
+                        <span class="small text-muted align-self-center">Повторное добавление обновит значение существующего критерия.</span>
+                    </div>
+                    <div class="col-12">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Критерий</th>
+                                        <th>Тип</th>
+                                        <th>Значение</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="selectedCriteriaBody">
+                                    <tr id="selectedCriteriaEmptyRow">
+                                        <td colspan="4" class="text-muted">Критерии пока не добавлены.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Создать объект</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Отмена</a>
+            </div>
+        </form>
+    </div>
+</section>
+
+<div class="modal fade" id="criterionPickerModal" tabindex="-1" aria-labelledby="criterionPickerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="criterionPickerModalLabel">Выбор критерия</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="criterionSearchInput" class="form-control mb-3" placeholder="Поиск: код, название, категория..." />
+                <div class="mb-3">
+                    <label class="form-label" for="criterionCategoryFilter">Категория</label>
+                    <select id="criterionCategoryFilter" class="form-select">
+                        <option value="">Не важно</option>
+                    </select>
+                </div>
+                <div id="criterionPickerList" class="list-group"></div>
+                <nav class="mt-3" aria-label="Страницы критериев">
+                    <ul id="criterionPickerPagination" class="pagination pagination-sm mb-0 justify-content-center"></ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Client Search Modal -->
+<div class="modal fade" id="clientSearchModal" tabindex="-1" aria-labelledby="clientSearchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="clientSearchModalLabel">Выбор клиента</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="clientSearchInput" class="form-control mb-3" placeholder="Поиск: ФИО, Email, Телефон..." />
+                <div id="clientSearchLoading" class="text-center d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                </div>
+                <div id="clientPickerList" class="list-group"></div>
+                <nav class="mt-3" aria-label="Страницы клиентов">
+                    <ul id="clientPickerPagination" class="pagination pagination-sm mb-0 justify-content-center"></ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+}
+
+@section Scripts {
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="~/js/explicit-submit-form.js" asp-append-version="true"></script>
+    <script src="~/js/real-estate-form-map.js" asp-append-version="true"></script>
+    <script src="~/js/real-estate-create-criteria.js" asp-append-version="true"></script>
+    <script>
+        const init = @Html.Raw(initJson);
+        window.realEstateFormMapInit({
+            mapElementId: "propertyMap",
+            latitudeInputId: "latitudeInput",
+            longitudeInputId: "longitudeInput",
+            addressInputId: "addressInput",
+            searchButtonId: "searchAddressButton",
+            statusElementId: "mapStatusText",
+            defaultLatitude: init.latitude,
+            defaultLongitude: init.longitude
+        });
+        window.realEstateCreateCriteriaInit({
+            formId: "realEstateCreateForm",
+            definitions: init.criteriaDefinitions,
+            criterionSearchInputId: "criterionSearchInput",
+            criterionCategoryFilterId: "criterionCategoryFilter",
+            criterionPickerListId: "criterionPickerList",
+            criterionPickerPaginationId: "criterionPickerPagination",
+            criterionPickerModalId: "criterionPickerModal",
+            criterionOpenPickerButtonId: "criterionOpenPickerButton",
+            criterionSelectedNameId: "criterionSelectedName",
+            criterionDefinitionSelectId: "criterionDefinitionSelect",
+            criterionEditorId: "criterionEditor",
+            addCriterionButtonId: "addCriterionButton",
+            selectedCriteriaBodyId: "selectedCriteriaBody",
+            selectedCriteriaEmptyRowId: "selectedCriteriaEmptyRow",
+            criteriaJsonInputId: "criteriaJson"
+        });
+    </script>
+    <script src="~/js/real-estate-client-picker.js" asp-append-version="true"></script>
+}

@@ -1,0 +1,177 @@
+﻿@model Web.Models.Dashboard.AdminComplaintsViewModel
+@using Web.Models.Dashboard
+@{
+    ViewData["Title"] = "Жалобы";
+    var activeMenu = (string?)ViewData["AdminActive"] ?? string.Empty;
+    var statuses = new[] { "All", "Opened", "InProgress", "Resolved" };
+    var categories = new[] { "Realtor", "PropertyDescriptionMismatch", "PoorPropertyMatching", "Other" };
+}
+
+<div class="row g-3">
+    <div class="col-xl-3 col-lg-4">
+        <partial name="_Sidebar" model="activeMenu" />
+    </div>
+    <div class="col-xl-9 col-lg-8">
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <h1 class="h4 mb-1">Жалобы</h1>
+                <div class="text-muted">Обработка обращений клиентов по сделкам и общих жалоб.</div>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">@Model.SuccessMessage</div>
+        }
+
+        @if (Model.ApiError is not null)
+        {
+            <partial name="_ApiErrorAlert" model="Model.ApiError" />
+        }
+
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <form asp-action="Complaints" method="get" class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Статус</label>
+                        <select name="status" class="form-select">
+                            @foreach (var item in statuses)
+                            {
+                                <option value="@item" selected="@(string.Equals(Model.FilterStatus, item, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">
+                                    @(string.Equals(item, "All", StringComparison.OrdinalIgnoreCase)
+                                        ? "Все"
+                                        : DashboardValueDisplay.ComplaintStatus(item))
+                                </option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Категория</label>
+                        <select name="category" class="form-select">
+                            <option value="">Все категории</option>
+                            @foreach (var item in categories)
+                            {
+                                <option value="@item" selected="@(string.Equals(Model.FilterCategory, item, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">
+                                    @DashboardValueDisplay.ComplaintCategory(item)
+                                </option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Привязка</label>
+                        <select name="link" class="form-select">
+                            <option value="" selected="@(string.IsNullOrWhiteSpace(Model.FilterLink) ? "selected" : null)">Все</option>
+                            <option value="linked" selected="@(string.Equals(Model.FilterLink, "linked", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">По сделке</option>
+                            <option value="general" selected="@(string.Equals(Model.FilterLink, "general", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Общая</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Сделка (ID)</label>
+                        <input type="text" name="dealId" value="@Model.FilterDealId" class="form-control" placeholder="Полный или частичный ID" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Клиент</label>
+                        <input type="text" name="client" value="@Model.FilterClientQuery" class="form-control" placeholder="Имя, телефон, email или ID" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Риелтор</label>
+                        <input type="text" name="realtor" value="@Model.FilterRealtorQuery" class="form-control" placeholder="Имя, телефон, email или ID" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Дата с</label>
+                        <input type="date" name="dateFrom" value="@Model.FilterDateFrom" class="form-control" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Дата по</label>
+                        <input type="date" name="dateTo" value="@Model.FilterDateTo" class="form-control" />
+                    </div>
+
+                    <div class="col-12 d-flex gap-2 pt-1">
+                        <button type="submit" class="btn btn-outline-primary">Применить</button>
+                        <a asp-action="Complaints" asp-route-status="All" class="btn btn-outline-secondary">Сброс</a>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h2 class="h6 text-uppercase text-muted">Список жалоб</h2>
+
+                @if (Model.Complaints.Count == 0)
+                {
+                    <div class="alert alert-light border mb-0">Жалобы не найдены по выбранным фильтрам.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 280px;">Жалоба</th>
+                                    <th style="min-width: 220px;">Клиент</th>
+                                    <th style="min-width: 220px;">Риелтор</th>
+                                    <th class="text-nowrap">Статус</th>
+                                    <th style="min-width: 260px;">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var complaint in Model.Complaints)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@complaint.Subject</div>
+                                            <div class="small text-muted mb-1">@DashboardValueDisplay.ComplaintCategory(complaint.Category)</div><div class="small text-muted">Создана: @complaint.CreatedDate.ToString("dd.MM.yyyy HH:mm")</div></td>
+                                        <td>
+                                            <div>@complaint.ClientFullName</div>
+                                            @if (!string.IsNullOrWhiteSpace(complaint.ClientPhoneNumber))
+                                            {
+                                                <div class="small text-muted">@complaint.ClientPhoneNumber</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(complaint.ClientEmail))
+                                            {
+                                                <div class="small text-muted">@complaint.ClientEmail</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrWhiteSpace(complaint.RealtorFullName))
+                                            {
+                                                <div>@complaint.RealtorFullName</div>
+                                                @if (!string.IsNullOrWhiteSpace(complaint.RealtorPhoneNumber))
+                                                {
+                                                    <div class="small text-muted">@complaint.RealtorPhoneNumber</div>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(complaint.RealtorEmail))
+                                                {
+                                                    <div class="small text-muted">@complaint.RealtorEmail</div>
+                                                }
+                                            }
+                                            else if (complaint.TargetRealtorId.HasValue)
+                                            {
+                                                <div class="small text-muted">@complaint.TargetRealtorId.Value</div>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">—</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border">@DashboardValueDisplay.ComplaintStatus(complaint.Status)</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <a asp-action="ComplaintDetails" asp-route-id="@complaint.Id" class="btn btn-sm btn-outline-primary">Открыть</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+</div>

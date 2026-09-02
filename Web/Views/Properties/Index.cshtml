@@ -1,0 +1,399 @@
+﻿@model Web.Models.Dashboard.RealtorDashboardViewModel
+@using Web.Models.Dashboard
+@using Web.Models.Properties
+@inject Web.Services.ICurrencyFormatter CurrencyFormatter
+@{
+    ViewData["Title"] = "Кабинет риелтора";
+    var baseCurrencyCode = CurrencyFormatter.GetClientSettings().BaseCurrencyCode;
+    var canManageActivityLogs = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Кабинет риелтора</h1>
+        @if (User.IsInRole("Admin"))
+        {
+            <a asp-controller="Admin" asp-action="RealtorAnalytics" class="btn btn-outline-secondary btn-sm">KPI-аналитика</a>
+        }
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-8">
+        <section class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <h2 class="h4 mb-3">Управление объектами</h2>
+                <form asp-action="CreateProperty" method="post" class="row g-2 mb-4">
+                    @Html.AntiForgeryToken()
+                    <div class="col-md-6">
+                        <label class="form-label">Заголовок</label>
+                        <input type="text" name="title" class="form-control" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Адрес</label>
+                        <input type="text" name="address" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Цена</label>
+                        <input type="number" name="price" step="1" min="1" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Площадь</label>
+                        <input type="number" name="area" step="0.1" min="1" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Комнат</label>
+                        <input type="number" name="roomsCount" min="1" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Широта</label>
+                        <input type="number" name="latitude" step="0.000001" class="form-control" value="47.0105" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Долгота</label>
+                        <input type="number" name="longitude" step="0.000001" class="form-control" value="28.8638" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Тип</label>
+                        <select name="type" class="form-select" required>
+                            <option value="Apartment">Apartment</option>
+                            <option value="House">House</option>
+                            <option value="Commercial">Commercial</option>
+                            <option value="Land">Land</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-sm">Создать объект</button>
+                    </div>
+                </form>
+
+                @if (Model.Properties.Count == 0)
+                {
+                    <div class="alert alert-light border mb-0">Объекты пока не загружены.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Объект</th>
+                                    <th>Статус</th>
+                                    <th>Цена</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var property in Model.Properties)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@property.Title</div>
+                                            <div class="small text-muted">@property.Address</div>
+                                        </td>
+                                        <td>@PropertyValueDisplay.Status(property.Status)</td>
+                                        <td>
+                                            <div>@CurrencyFormatter.Format(property.OriginalPriceAmount, property.OriginalPriceCurrency)</div>
+                                            @if (!string.Equals(property.OriginalPriceCurrency, baseCurrencyCode, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <div class="small text-muted">≈ @CurrencyFormatter.Format(property.Price)</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <form asp-action="UpdatePropertyPrice" method="post" class="d-flex gap-2">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="propertyId" value="@property.Id" />
+                                                    <input type="number"
+                                                           name="newPrice"
+                                                           min="1"
+                                                           step="1"
+                                                           class="form-control form-control-sm"
+                                                           value="@property.Price"
+                                                           style="max-width: 120px;" />
+                                                    <button type="submit" class="btn btn-outline-primary btn-sm">Обновить цену</button>
+                                                </form>
+                                                <form asp-action="MarkAsSold" method="post">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="propertyId" value="@property.Id" />
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Mark-as-sold</button>
+                                                </form>
+                                                <a asp-action="Details" asp-route-id="@property.Id" class="btn btn-outline-dark btn-sm">Детали</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+
+    <div class="col-lg-4">
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+                <h2 class="h4 mb-3">Что улучшить</h2>
+                @if (Model.ImprovementHints.Count == 0)
+                {
+                    <div class="alert alert-light border mb-0">Пока нет рекомендаций.</div>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var hint in Model.ImprovementHints)
+                        {
+                            var badgeClass = hint.Severity switch
+                            {
+                                "Success" => "text-bg-success",
+                                "Warning" => "text-bg-warning",
+                                _ => "text-bg-secondary"
+                            };
+
+                            <div class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="fw-semibold">@hint.Title</div>
+                                    <span class="badge @badgeClass">@hint.Severity</span>
+                                </div>
+                                <div class="small text-muted mt-1">@hint.Message</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <h2 class="h4 mb-3">Проверка подписчиков по объекту</h2>
+                <form asp-action="Index" method="get" class="mb-3">
+                    <div class="mb-2">
+                        <label class="form-label">PropertyId</label>
+                        <input type="text" name="subscribersPropertyId" class="form-control" placeholder="GUID" />
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Проверить</button>
+                </form>
+
+                @if (Model.SubscribersInfo is null)
+                {
+                    <div class="alert alert-light border mb-0">Выберите объект и выполните проверку.</div>
+                }
+                else
+                {
+                    <div class="alert alert-info mb-0">
+                        Для объекта <span class="text-break">@Model.SubscribersInfo.PropertyId</span><br />
+                        найдено клиентов для уведомления: <strong>@Model.SubscribersInfo.ClientsCount</strong>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+</div>
+
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-4">
+        <h2 class="h4 mb-3">Сделки</h2>
+
+        <form asp-action="Index" method="get" class="row g-2 mb-3">
+            <div class="col-md-5">
+                <label class="form-label">Фильтр по RealtorId</label>
+                <input type="text" name="dealsByRealtorId" class="form-control" value="@Model.DealsByRealtorId" placeholder="GUID" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Фильтр по ClientId</label>
+                <input type="text" name="dealsByClientId" class="form-control" value="@Model.DealsByClientId" placeholder="GUID" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary btn-sm w-100">Применить</button>
+            </div>
+        </form>
+
+        @if (Model.Deals.Count == 0)
+        {
+            <div class="alert alert-light border mb-0">Сделки пока не загружены.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>DealId</th>
+                            <th>Status</th>
+                            <th>Комиссия</th>
+                            <th>Выплата</th>
+                            <th>Доход агентства</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var deal in Model.Deals)
+                        {
+                            <tr>
+                                <td class="text-break">@deal.Id</td>
+                                <td>@DashboardValueDisplay.DealStatus(deal.Status)</td>
+                                <td>@CurrencyFormatter.Format(deal.CommissionAmount, deal.CommissionCurrency)</td>
+                                <td>
+                                    <div>@CurrencyFormatter.Format(deal.RealtorPayoutAmount, deal.RealtorPayoutCurrency)</div>
+                                    <div class="small text-muted">@deal.RealtorCommissionPercent.ToString("0.##")%</div>
+                                </td>
+                                <td>@CurrencyFormatter.Format(deal.AgencyNetCommissionAmount, deal.AgencyNetCommissionCurrency)</td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <form asp-action="CompleteDeal" method="post" class="d-flex gap-2">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="dealId" value="@deal.Id" />
+                                            <input type="number"
+                                                   name="commissionAmount"
+                                                   class="form-control form-control-sm"
+                                                   min="0"
+                                                   step="1"
+                                                   value="@deal.CommissionAmount"
+                                                   style="max-width: 110px;" />
+                                            <input type="text"
+                                                   name="commissionCurrency"
+                                                   class="form-control form-control-sm"
+                                                   value="@deal.CommissionCurrency"
+                                                   style="max-width: 80px;" />
+                                            <button type="submit" class="btn btn-outline-success btn-sm">Complete</button>
+                                        </form>
+                                        <form asp-action="CancelDeal" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="dealId" value="@deal.Id" />
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">Cancel</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <h2 class="h4 mb-3">Activity logs</h2>
+
+        <div class="row g-3 mb-3">
+            @if (canManageActivityLogs)
+            {
+            <div class="col-lg-6">
+                <form asp-action="CreateActivityLog" method="post" class="row g-2">
+                    @Html.AntiForgeryToken()
+                    <div class="col-12">
+                        <label class="form-label">RealtorId</label>
+                        <input type="text" name="realtorId" class="form-control" placeholder="GUID" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Тип</label>
+                        <select name="type" class="form-select">
+                            <option value="PropertyShowing">PropertyShowing</option>
+                            <option value="ClientCall">ClientCall</option>
+                            <option value="StatusUpdate">StatusUpdate</option>
+                            <option value="PropertyListing">PropertyListing</option>
+                            <option value="DealClosure">DealClosure</option>
+                            <option value="DealCancellation">DealCancellation</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Points</label>
+                        <input type="number" name="points" class="form-control" value="1" />
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Добавить</button>
+                    </div>
+                </form>
+            </div>
+            }
+
+            <div class="@(canManageActivityLogs ? "col-lg-6" : "col-lg-12")">
+                <form asp-action="Index" method="get" class="row g-2">
+                    <div class="col-9">
+                        <label class="form-label">Фильтр по RealtorId</label>
+                        <input type="text" name="activityByRealtorId" class="form-control" value="@Model.ActivityByRealtorId" placeholder="GUID" />
+                    </div>
+                    <div class="col-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-outline-primary btn-sm w-100">Фильтр</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        @if (Model.ActivityLogs.Count == 0)
+        {
+            <div class="alert alert-light border mb-0">Activity logs пока отсутствуют.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>LogId</th>
+                            <th>RealtorId</th>
+                            <th>Тип</th>
+                            <th>Points</th>
+                            <th>Дата</th>
+                            @if (canManageActivityLogs)
+                            {
+                                <th>Действия</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in Model.ActivityLogs.OrderByDescending(x => x.CreatedDate))
+                        {
+                            <tr>
+                                <td class="text-break">@log.Id</td>
+                                <td class="text-break">@log.RealtorId</td>
+                                <td>@DashboardValueDisplay.ActivityType(log.Type)</td>
+                                <td>@log.Points</td>
+                                <td>@log.CreatedDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                @if (canManageActivityLogs)
+                                {
+                                <td>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <form asp-action="UpdateActivityLog" method="post" class="d-flex gap-2">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="activityLogId" value="@log.Id" />
+                                            <select name="type" class="form-select form-select-sm" style="max-width: 170px;">
+                                                <option value="PropertyShowing">PropertyShowing</option>
+                                                <option value="ClientCall">ClientCall</option>
+                                                <option value="StatusUpdate">StatusUpdate</option>
+                                                <option value="PropertyListing">PropertyListing</option>
+                                                <option value="DealClosure">DealClosure</option>
+                                                <option value="DealCancellation">DealCancellation</option>
+                                            </select>
+                                            <input type="number" name="points" class="form-control form-control-sm" value="@log.Points" style="max-width: 90px;" />
+                                            <button type="submit" class="btn btn-outline-primary btn-sm">Обновить</button>
+                                        </form>
+                                        <form asp-action="DeleteActivityLog" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="activityLogId" value="@log.Id" />
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
+                                        </form>
+                                    </div>
+                                </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>

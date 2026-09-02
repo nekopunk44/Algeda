@@ -1,0 +1,53 @@
+@model Web.Models.Auth.ResendEmailConfirmationRequest
+@{
+    ViewData["Title"] = "Новый код подтверждения";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8 col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h3 mb-3">Новый код подтверждения</h1>
+                <p class="text-muted mb-4">
+                    Укажите email регистрации. На почту будет отправлен новый шестизначный код.
+                </p>
+
+                @if (ViewData["ApiError"] is Web.Models.Api.ApiErrorViewModel apiError)
+                {
+                    <partial name="_ApiErrorAlert" model="apiError" />
+                }
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                }
+
+                <form asp-action="ResendConfirmation" method="post" class="vstack gap-3">
+                    @Html.AntiForgeryToken()
+
+                    <div>
+                        <label asp-for="Email" class="form-label">Email</label>
+                        <input asp-for="Email" class="form-control" autocomplete="email" placeholder="name@example.com" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-12 col-sm-4 d-grid">
+                            <button type="submit" class="btn btn-primary">Отправить код</button>
+                        </div>
+                        <div class="col-12 col-sm-4 d-grid">
+                            <a asp-action="ConfirmEmail" asp-route-email="@Model.Email" class="btn btn-outline-secondary">Ввести код</a>
+                        </div>
+                        <div class="col-12 col-sm-4 d-grid">
+                            <a asp-action="Login" class="btn btn-outline-secondary">Ко входу</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,18 @@
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E8FBF6"/>
+      <stop offset="1" stop-color="#C8F2E8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="700" fill="url(#bg)"/>
+  <rect x="110" y="520" width="980" height="80" rx="20" fill="#2A7F6C"/>
+  <rect x="180" y="360" width="150" height="160" rx="14" fill="#1F6958"/>
+  <rect x="380" y="300" width="150" height="220" rx="14" fill="#1B5D4E"/>
+  <rect x="580" y="230" width="150" height="290" rx="14" fill="#165142"/>
+  <rect x="780" y="160" width="150" height="360" rx="14" fill="#114638"/>
+  <path d="M150 210L350 260L550 220L750 170L980 100" stroke="#0E7D62" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="980" cy="100" r="24" fill="#0E7D62"/>
+  <text x="90" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700" fill="#0D4C3E">Инвестиционные объекты</text>
+  <text x="90" y="147" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#176352">Коммерческая недвижимость и рост стоимости</text>
+</svg>

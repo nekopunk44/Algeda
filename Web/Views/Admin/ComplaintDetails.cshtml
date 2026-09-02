@@ -1,0 +1,177 @@
+﻿@model Web.Models.Dashboard.AdminComplaintDetailsViewModel
+@using Web.Models.Dashboard
+@{
+    ViewData["Title"] = "Жалоба";
+    var activeMenu = (string?)ViewData["AdminActive"] ?? string.Empty;
+    var complaint = Model.Complaint;
+}
+
+<div class="row g-3">
+    <div class="col-xl-3 col-lg-4">
+        <partial name="_Sidebar" model="activeMenu" />
+    </div>
+    <div class="col-xl-9 col-lg-8">
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h4 mb-1">Детали жалобы</h1>
+                    <div class="text-muted">Полный просмотр и модерация жалобы.</div>
+                </div>
+                <a asp-action="Complaints" asp-route-status="All" class="btn btn-outline-secondary">К списку</a>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">@Model.SuccessMessage</div>
+        }
+
+        @if (Model.ApiError is not null)
+        {
+            <partial name="_ApiErrorAlert" model="Model.ApiError" />
+        }
+
+        @if (complaint is null)
+        {
+            <div class="alert alert-light border">Жалоба не найдена.</div>
+        }
+        else
+        {
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <div class="h5 mb-1">@complaint.Subject</div>
+                            <div class="small text-muted">@DashboardValueDisplay.ComplaintCategory(complaint.Category)</div>
+                        </div>
+                        <span class="badge bg-light text-dark border">@DashboardValueDisplay.ComplaintStatus(complaint.Status)</span>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="small text-muted">Клиент</div>
+                            <div>@complaint.ClientFullName</div>
+                            @if (!string.IsNullOrWhiteSpace(complaint.ClientPhoneNumber))
+                            {
+                                <div class="small text-muted">@complaint.ClientPhoneNumber</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(complaint.ClientEmail))
+                            {
+                                <div class="small text-muted">@complaint.ClientEmail</div>
+                            }
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted">Риелтор</div>
+                            <div>@(string.IsNullOrWhiteSpace(complaint.RealtorFullName) ? "—" : complaint.RealtorFullName)</div>
+                            @if (!string.IsNullOrWhiteSpace(complaint.RealtorPhoneNumber))
+                            {
+                                <div class="small text-muted">@complaint.RealtorPhoneNumber</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(complaint.RealtorEmail))
+                            {
+                                <div class="small text-muted">@complaint.RealtorEmail</div>
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted">Сделка</div>
+                            @if (complaint.DealId.HasValue)
+                            {
+                                <a asp-controller="DealRequests"
+                                   asp-action="Details"
+                                   asp-route-id="@complaint.DealId.Value"
+                                   asp-route-scope="incoming"
+                                   class="text-break">@complaint.DealId.Value</a>
+                            }
+                            else
+                            {
+                                <div class="text-break">—</div>
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted">Объект</div>
+                            @if (complaint.PropertyId.HasValue)
+                            {
+                                <a asp-controller="Properties"
+                                   asp-action="Details"
+                                   asp-route-id="@complaint.PropertyId.Value"
+                                   class="text-break">@complaint.PropertyId.Value</a>
+                            }
+                            else
+                            {
+                                <div class="text-break">—</div>
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted">Создана</div>
+                            <div>@complaint.CreatedDate.ToString("dd.MM.yyyy HH:mm")</div>
+                        </div>
+                    </div>
+
+                    <div class="small text-muted mb-1">Описание</div>
+                    <div class="border rounded p-3 bg-light-subtle text-break">@complaint.Description</div>
+
+                    @if (!string.IsNullOrWhiteSpace(complaint.AdminResolution))
+                    {
+                        <div class="small text-muted mt-3 mb-1">Решение администратора</div>
+                        <div class="border rounded p-3">@complaint.AdminResolution</div>
+                        <div class="small text-muted mt-1">Вердикт: @DashboardValueDisplay.ComplaintVerdict(complaint.ModerationVerdict)</div>
+                    }
+                </div>
+            </section>
+
+            @if (!string.Equals(complaint.Status, "Resolved", StringComparison.OrdinalIgnoreCase))
+            {
+                <section class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h2 class="h6 text-uppercase text-muted mb-2">Обработка</h2>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 border rounded px-3 py-2 mb-3">
+                            <div>
+                                <div class="small text-muted">Текущий статус</div>
+                                <div class="fw-semibold">@DashboardValueDisplay.ComplaintStatus(complaint.Status)</div>
+                            </div>
+                            @if (string.Equals(complaint.Status, "InProgress", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <form asp-action="MarkComplaintOpened" method="post" class="mb-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="complaintId" value="@complaint.Id" />
+                                    <input type="hidden" name="returnToDetails" value="true" />
+                                    <button type="submit" class="btn btn-outline-secondary">Убрать из работы</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form asp-action="MarkComplaintInProgress" method="post" class="mb-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="complaintId" value="@complaint.Id" />
+                                    <input type="hidden" name="returnToDetails" value="true" />
+                                    <button type="submit" class="btn btn-outline-primary">В работу</button>
+                                </form>
+                            }
+                        </div>
+
+                        <form asp-action="ResolveComplaint" method="post" class="row g-2 mt-1">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="complaintId" value="@complaint.Id" />
+                            <input type="hidden" name="returnToDetails" value="true" />
+                            <div class="col-md-4">
+                                <label class="form-label">Вердикт</label>
+                                <select class="form-select" name="verdict" required>
+                                    <option value="Confirmed">Подтверждена</option>
+                                    <option value="PartiallyConfirmed">Частично подтверждена</option>
+                                    <option value="NotConfirmed">Не подтверждена</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Комментарий решения</label>
+                                <input type="text" name="resolution" class="form-control" maxlength="4000" required />
+                            </div>
+                            <div class="col-12 pt-3">
+                                <button type="submit" class="btn btn-success">Сохранить решение</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            }
+        }
+    </div>
+</div>

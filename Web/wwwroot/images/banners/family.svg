@@ -1,0 +1,16 @@
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF5E8"/>
+      <stop offset="1" stop-color="#FDE2C1"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="700" fill="url(#bg)"/>
+  <rect x="120" y="320" width="960" height="280" rx="24" fill="#F4B067"/>
+  <path d="M90 360L600 110L1110 360V415H90V360Z" fill="#D7802A"/>
+  <rect x="220" y="420" width="170" height="180" rx="14" fill="#A85F1A"/>
+  <rect x="480" y="430" width="130" height="170" rx="14" fill="#FDE3BE"/>
+  <rect x="720" y="420" width="170" height="180" rx="14" fill="#A85F1A"/>
+  <text x="90" y="90" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700" fill="#7D4511">Семейные дома</text>
+  <text x="90" y="145" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#9A5B20">Пространство, тишина и комфорт для всей семьи</text>
+</svg>

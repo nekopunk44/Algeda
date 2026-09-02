@@ -1,0 +1,47 @@
+﻿@{
+    ViewData["Title"] = "Регистрация";
+}
+
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-9">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h3 mb-3">Кто вы?</h1>
+                <p class="text-muted mb-4">
+                    Выберите вариант регистрации. После создания аккаунта нужно подтвердить email,
+                    а заявка риелтора дополнительно проходит проверку администратором.
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <article class="card h-100 border">
+                            <div class="card-body">
+                                <h2 class="h5">Я клиент</h2>
+                                <p class="text-muted mb-3">
+                                    После регистрации нужно подтвердить email. Затем можно сразу войти.
+                                </p>
+                                <a asp-action="RegisterClient" class="btn btn-primary">Зарегистрироваться как клиент</a>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="col-md-6">
+                        <article class="card h-100 border">
+                            <div class="card-body">
+                                <h2 class="h5">Я риелтор</h2>
+                                <p class="text-muted mb-3">
+                                    Сначала подтвердите email, затем заявка будет рассмотрена администратором.
+                                </p>
+                                <a asp-action="RegisterRealtor" class="btn btn-outline-primary">Подать заявку риелтора</a>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <a asp-action="Login" class="text-decoration-none">Уже есть аккаунт? Перейти ко входу</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

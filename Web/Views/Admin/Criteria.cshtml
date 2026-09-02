@@ -1,0 +1,351 @@
+@model Web.Models.Dashboard.AdminCriteriaViewModel
+@using Web.Models.Dashboard
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Критерии недвижимости";
+    var activeMenu = (string?)ViewData["AdminActive"] ?? string.Empty;
+    var criteriaPage = Model.CriteriaPage;
+    var categories = Model.Categories;
+    var existingCriteriaJson = JsonSerializer.Serialize(Model.ExistingCriteria.Select(x => new
+    {
+        id = x.Id,
+        code = x.Code,
+        displayName = x.DisplayName,
+        description = x.Description,
+        category = x.Category,
+        valueType = x.ValueType,
+        options = x.Options.Select(o => new { value = o.Value, label = o.Label })
+    }));
+}
+
+<div class="row g-3">
+    <div class="col-xl-3 col-lg-4">
+        <partial name="_Sidebar" model="activeMenu" />
+    </div>
+    <div class="col-xl-9 col-lg-8">
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <div>
+                        <h1 class="h4 mb-1">Критерии недвижимости</h1>
+                        <div class="text-muted">Управление справочником критериев.</div>
+                    </div>
+                </div>
+
+                <h2 class="h5 mb-3">Создать критерий</h2>
+                <form asp-action="CreateCriterion" method="post" class="row g-2 js-criterion-form" data-check-similar="true">
+                    @Html.AntiForgeryToken()
+                    <div class="col-md-4">
+                        <label class="form-label">Код</label>
+                        <div class="input-group">
+                            <input type="text" name="code" class="form-control js-criterion-code" maxlength="100" pattern="[A-Za-z0-9_-]+" required />
+                            <button type="button" class="btn btn-outline-secondary js-generate-code">Сгенерировать</button>
+                        </div>
+                        <div class="form-text">Латиница, цифры, _ и -. Код можно поменять вручную.</div>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Название</label>
+                        <input type="text" name="displayName" class="form-control js-criterion-name" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Тип значения</label>
+                        <select name="valueType" class="form-select js-criterion-value-type" required>
+                            <option value="Boolean">Логический</option>
+                            <option value="Number">Число</option>
+                            <option value="Text">Текст</option>
+                            <option value="SingleSelect">Одиночный выбор</option>
+                            <option value="MultiSelect">Множественный выбор</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Категория</label>
+                        <select name="category" class="form-select">
+                            <option value="">Без категории</option>
+                            @foreach (var category in categories)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4 form-check mt-4 ms-md-2">
+                        <input class="form-check-input" type="checkbox" name="isHidden" value="true" id="createHidden" />
+                        <label class="form-check-label" for="createHidden">Скрытый критерий</label>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Описание</label>
+                        <input type="text" name="description" class="form-control js-criterion-description" />
+                    </div>
+                    <div class="col-12 js-options-editor">
+                        <label class="form-label">Опции для выбора</label>
+                        <input type="hidden" name="optionsText" class="js-options-text" />
+                        <textarea class="js-options-seed d-none"></textarea>
+
+                        <div class="border rounded-3 p-2 bg-light-subtle js-options-panel">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-2">
+                                    <thead>
+                                        <tr>
+                                            <th>Значение</th>
+                                            <th>Подпись</th>
+                                            <th style="width: 120px;">Порядок</th>
+                                            <th style="width: 90px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="js-options-rows"></tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm js-add-option">Добавить опцию</button>
+                            <div class="form-text mt-2">Заполняйте опции только для типов «Одиночный выбор» и «Множественный выбор».</div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Создать критерий</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <form method="get" asp-action="Criteria" class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Поиск</label>
+                        <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="Код, название, категория" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Сортировка</label>
+                        <select name="sort" class="form-select">
+                            <option value="name_asc" selected="@(Model.Sort == "name_asc" ? "selected" : null)">По названию (А-Я)</option>
+                            <option value="name_desc" selected="@(Model.Sort == "name_desc" ? "selected" : null)">По названию (Я-А)</option>
+                            <option value="created_desc" selected="@(Model.Sort == "created_desc" ? "selected" : null)">Сначала новые</option>
+                            <option value="created_asc" selected="@(Model.Sort == "created_asc" ? "selected" : null)">Сначала старые</option>
+                            <option value="code_asc" selected="@(Model.Sort == "code_asc" ? "selected" : null)">По коду (А-Я)</option>
+                            <option value="code_desc" selected="@(Model.Sort == "code_desc" ? "selected" : null)">По коду (Я-А)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">На странице</label>
+                        <select name="pageSize" class="form-select">
+                            <option value="10" selected="@(criteriaPage.PageSize == 10 ? "selected" : null)">10</option>
+                            <option value="20" selected="@(criteriaPage.PageSize == 20 ? "selected" : null)">20</option>
+                            <option value="50" selected="@(criteriaPage.PageSize == 50 ? "selected" : null)">50</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 form-check mt-4 ms-md-2">
+                        <input class="form-check-input" type="checkbox" id="includeHidden" name="includeHidden" value="true" checked="@(Model.IncludeHidden ? "checked" : null)" />
+                        <label class="form-check-label" for="includeHidden">Показывать скрытые</label>
+                    </div>
+                    <input type="hidden" name="page" value="1" />
+                    <div class="col-md-1 d-grid">
+                        <button type="submit" class="btn btn-primary">Найти</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">@Model.SuccessMessage</div>
+        }
+
+        @if (Model.ApiError is not null)
+        {
+            <partial name="_ApiErrorAlert" model="Model.ApiError" />
+        }
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 mb-0">Список критериев</h2>
+                    <span class="text-muted small">Всего: @criteriaPage.TotalCount</span>
+                </div>
+
+                @if (criteriaPage.Items.Count == 0)
+                {
+                    <div class="alert alert-light border mb-0">Критерии не найдены.</div>
+                }
+                else
+                {
+                    <div class="d-grid gap-3">
+                        @foreach (var criterion in criteriaPage.Items)
+                        {
+                            <article class="border rounded-3 p-3 bg-light-subtle">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                                    <div>
+                                        <div class="fw-semibold">@criterion.DisplayName</div>
+                                        <div class="small text-muted">@criterion.Code · @DashboardValueDisplay.CriterionValueType(criterion.ValueType)</div>
+                                        <div class="small text-muted">Категория: @(string.IsNullOrWhiteSpace(criterion.Category) ? "—" : criterion.Category)</div>
+                                        <div class="small text-muted">Опций: @criterion.OptionsCount</div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <form asp-action="SetCriterionHidden" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="criterionId" value="@criterion.Id" />
+                                            <input type="hidden" name="isHidden" value="@(!criterion.IsHidden ? "true" : "false")" />
+                                            <input type="hidden" name="page" value="@criteriaPage.Page" />
+                                            <input type="hidden" name="pageSize" value="@criteriaPage.PageSize" />
+                                            <input type="hidden" name="search" value="@Model.Search" />
+                                            <input type="hidden" name="sort" value="@Model.Sort" />
+                                            <input type="hidden" name="includeHidden" value="@(Model.IncludeHidden ? "true" : "false")" />
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">@(criterion.IsHidden ? "Отобразить" : "Скрыть")</button>
+                                        </form>
+                                        <form asp-action="DeleteCriterion" method="post" onsubmit="return confirm('Удалить критерий?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="criterionId" value="@criterion.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                <details>
+                                    <summary class="text-primary-emphasis">Редактировать</summary>
+                                    <form asp-action="UpdateCriterion" method="post" class="row g-2 mt-2 js-criterion-form" data-criterion-id="@criterion.Id">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="criterionId" value="@criterion.Id" />
+                                        <div class="col-md-4">
+                                            <label class="form-label">Код</label>
+                                            <div class="input-group">
+                                                <input type="text" name="code" class="form-control js-criterion-code" value="@criterion.Code" maxlength="100" pattern="[A-Za-z0-9_-]+" required />
+                                                <button type="button" class="btn btn-outline-secondary js-generate-code">Сгенерировать</button>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <label class="form-label">Название</label>
+                                            <input type="text" name="displayName" class="form-control js-criterion-name" value="@criterion.DisplayName" required />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Тип значения</label>
+                                            <select name="valueType" class="form-select js-criterion-value-type" required>
+                                                <option value="Boolean" selected="@(criterion.ValueType == "Boolean" ? "selected" : null)">Логический</option>
+                                                <option value="Number" selected="@(criterion.ValueType == "Number" ? "selected" : null)">Число</option>
+                                                <option value="Text" selected="@(criterion.ValueType == "Text" ? "selected" : null)">Текст</option>
+                                                <option value="SingleSelect" selected="@(criterion.ValueType == "SingleSelect" ? "selected" : null)">Одиночный выбор</option>
+                                                <option value="MultiSelect" selected="@(criterion.ValueType == "MultiSelect" ? "selected" : null)">Множественный выбор</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Категория</label>
+                                            @{
+                                                var normalizedCriterionCategory = string.IsNullOrWhiteSpace(criterion.Category)
+                                                    ? null
+                                                    : criterion.Category.Trim();
+                                            }
+                                            <select name="category" class="form-select">
+                                                <option value="">Без категории</option>
+                                                @foreach (var category in categories)
+                                                {
+                                                    var isSelected = string.Equals(
+                                                        category,
+                                                        normalizedCriterionCategory,
+                                                        StringComparison.OrdinalIgnoreCase);
+                                                    <option value="@category" selected="@(isSelected ? "selected" : null)">@category</option>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(normalizedCriterionCategory)
+                                                    && !categories.Any(x => string.Equals(
+                                                        x,
+                                                        normalizedCriterionCategory,
+                                                        StringComparison.OrdinalIgnoreCase)))
+                                                {
+                                                    <option value="@normalizedCriterionCategory" selected="selected">@normalizedCriterionCategory</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4 form-check mt-4 ms-md-2">
+                                            <input class="form-check-input" type="checkbox" name="isHidden" value="true" checked="@(criterion.IsHidden ? "checked" : null)" id="hidden_@criterion.Id" />
+                                            <label class="form-check-label" for="hidden_@criterion.Id">Скрытый критерий</label>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Описание</label>
+                                            <input type="text" name="description" class="form-control js-criterion-description" value="@criterion.Description" />
+                                        </div>
+                                        <div class="col-12 js-options-editor">
+                                            <label class="form-label">Опции для выбора</label>
+                                            <input type="hidden" name="optionsText" class="js-options-text" />
+                                            <textarea class="js-options-seed d-none">@criterion.OptionsEditorText</textarea>
+
+                                            <div class="border rounded-3 p-2 bg-white js-options-panel">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm align-middle mb-2">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Значение</th>
+                                                                <th>Подпись</th>
+                                                                <th style="width: 120px;">Порядок</th>
+                                                                <th style="width: 90px;"></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody class="js-options-rows"></tbody>
+                                                    </table>
+                                                </div>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm js-add-option">Добавить опцию</button>
+                                                <div class="form-text mt-2">При сохранении список опций будет обновлен.</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <button type="submit" class="btn btn-outline-primary btn-sm">Сохранить изменения</button>
+                                        </div>
+                                    </form>
+                                </details>
+                            </article>
+                        }
+                    </div>
+
+                    <nav class="mt-3" aria-label="Пагинация критериев">
+                        <ul class="pagination mb-0">
+                            @for (var p = 1; p <= criteriaPage.TotalPages; p++)
+                            {
+                                <li class="page-item @(p == criteriaPage.Page ? "active" : string.Empty)">
+                                    <a class="page-link"
+                                       asp-action="Criteria"
+                                       asp-route-page="@p"
+                                       asp-route-pageSize="@criteriaPage.PageSize"
+                                       asp-route-search="@Model.Search"
+                                       asp-route-sort="@Model.Sort"
+                                       asp-route-includeHidden="@Model.IncludeHidden">@p</a>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
+                }
+            </div>
+        </section>
+    </div>
+</div>
+
+<div class="modal fade" id="similarCriterionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5">Существует похожий критерий</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="border rounded-3 p-3 h-100">
+                            <div class="fw-semibold mb-2">Новый критерий</div>
+                            <div id="similarCriterionNew" class="small"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="border rounded-3 p-3 h-100">
+                            <div class="fw-semibold mb-2">Существующий критерий</div>
+                            <div id="similarCriterionExisting" class="small"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отменить создание</button>
+                <button type="button" class="btn btn-primary" id="createSimilarCriterionAnyway">Все равно создать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.adminCriteriaExisting = @Html.Raw(existingCriteriaJson);
+    </script>
+    <script src="~/js/admin-criteria-options.js" asp-append-version="true"></script>
+}

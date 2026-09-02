@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgis/postgis:18-3.6
+    container_name: algeda_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-algeda}
+      POSTGRES_USER: ${POSTGRES_USER:-algeda}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: API/Dockerfile
+    container_name: algeda_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-algeda};Username=${POSTGRES_USER:-algeda};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}
+      Cors__AllowedOrigins__0: ${WEB_ORIGIN:-http://localhost:5000}
+      Email__Enabled: "false"
+      IdentitySeed__Enabled: "false"
+      Seeding__PropertyCriteriaDictionary__RunOnStartup: "false"
+      AutoMatchingWorker__Enabled: "true"
+      PropertyPhotoStorage__LegacyMigration__Enabled: "false"
+    ports:
+      - "5142:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: Web/Dockerfile
+    container_name: algeda_web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      Api__BaseUrl: http://api:8080
+    ports:
+      - "5000:8080"
+
+volumes:
+  postgres_data:

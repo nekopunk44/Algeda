@@ -1,0 +1,121 @@
+@model Web.Models.Auth.ConfirmEmailRequest
+@{
+    ViewData["Title"] = "Подтверждение email";
+    var hasEmail = !string.IsNullOrWhiteSpace(Model.Email);
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8 col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h3 mb-3">Подтверждение email</h1>
+                <p class="text-muted mb-4">
+                    Введите шестизначный код из письма. Новый код делает предыдущий недействительным.
+                </p>
+
+                @if (ViewData["ApiError"] is Web.Models.Api.ApiErrorViewModel apiError)
+                {
+                    <partial name="_ApiErrorAlert" model="apiError" />
+                }
+
+                @if (ViewData["AuthSuccess"] is string successMessage && !string.IsNullOrWhiteSpace(successMessage))
+                {
+                    <div class="alert alert-success">
+                        @successMessage
+                        @if (successMessage.Contains("подтвержден", StringComparison.OrdinalIgnoreCase)
+                             || successMessage.Contains("завершена", StringComparison.OrdinalIgnoreCase)
+                             || successMessage.Contains("отправлена", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <div class="mt-2">
+                                <a asp-action="Login" class="btn btn-sm btn-outline-success">Перейти ко входу</a>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                }
+
+                <form asp-action="ConfirmEmail" method="post" class="vstack gap-3">
+                    @Html.AntiForgeryToken()
+
+                    <div>
+                        <label asp-for="Email" class="form-label">Email</label>
+                        @if (hasEmail)
+                        {
+                            <input asp-for="Email" class="form-control" autocomplete="email" readonly />
+                        }
+                        else
+                        {
+                            <input asp-for="Email" class="form-control" autocomplete="email" placeholder="name@example.com" />
+                        }
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+
+                    <div>
+                        <label asp-for="Code" class="form-label">Код подтверждения</label>
+                        <input asp-for="Code"
+                               class="form-control text-center fs-4"
+                               inputmode="numeric"
+                               autocomplete="one-time-code"
+                               maxlength="6"
+                               placeholder="000000" />
+                        <span asp-validation-for="Code" class="text-danger"></span>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-12 col-sm-6 d-grid">
+                            <button type="submit" class="btn btn-primary">Подтвердить email</button>
+                        </div>
+                        <div class="col-12 col-sm-6 d-grid">
+                            <a asp-action="Login" class="btn btn-outline-secondary">Ко входу</a>
+                        </div>
+                    </div>
+                </form>
+
+                <form asp-action="ResendConfirmation" method="post" class="mt-2">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Email" value="@Model.Email" />
+                    <div class="d-grid">
+                        <button type="submit"
+                                id="resendConfirmationButton"
+                                class="btn btn-outline-primary"
+                                disabled>
+                            Отправить код еще раз через 30 сек.
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const button = document.getElementById('resendConfirmationButton');
+            if (!button) {
+                return;
+            }
+
+            let secondsLeft = 30;
+            const render = () => {
+                if (secondsLeft <= 0) {
+                    button.disabled = false;
+                    button.textContent = 'Отправить код еще раз';
+                    return;
+                }
+
+                button.disabled = true;
+                button.textContent = `Отправить код еще раз через ${secondsLeft} сек.`;
+                secondsLeft -= 1;
+                window.setTimeout(render, 1000);
+            };
+
+            render();
+        })();
+    </script>
+}

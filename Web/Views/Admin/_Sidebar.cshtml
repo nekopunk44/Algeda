@@ -1,0 +1,28 @@
+﻿@model string
+@{
+    var active = Model ?? string.Empty;
+
+    string ItemClass(string key)
+    {
+        var isActive = string.Equals(active, key, StringComparison.OrdinalIgnoreCase);
+        return isActive
+            ? "list-group-item list-group-item-action active"
+            : "list-group-item list-group-item-action";
+    }
+}
+
+<aside class="admin-sidebar card border-0 shadow-sm">
+    <div class="card-header bg-white fw-semibold">Админ-панель</div>
+    <div class="list-group list-group-flush">
+        <a class="@ItemClass("SystemSettings")" asp-controller="Admin" asp-action="SystemSettings">Настройки системы</a>
+        <a class="@ItemClass("Criteria")" asp-controller="Admin" asp-action="Criteria">Критерии недвижимости</a>
+        <a class="@ItemClass("Currencies")" asp-controller="Admin" asp-action="Currencies">Валюты и курсы</a>
+        <a class="@ItemClass("Clients")" asp-controller="Admin" asp-action="Clients">Клиенты</a>
+        <a class="@ItemClass("Access")" asp-controller="Admin" asp-action="Access">Управление доступом</a>
+        <a class="@ItemClass("DocumentAccess")" asp-controller="Admin" asp-action="DocumentAccess">Доступ к документам</a>
+        <a class="@ItemClass("RealtorRequests")" asp-controller="Admin" asp-action="RealtorRequests">Заявки риелторов</a>
+        <a class="@ItemClass("Complaints")" asp-controller="Admin" asp-action="Complaints">Жалобы</a>
+        <a class="@ItemClass("DealChats")" asp-controller="Admin" asp-action="DealChats">Чаты по сделкам</a>
+        <a class="@ItemClass("RealtorAnalytics")" asp-controller="Admin" asp-action="RealtorAnalytics">Эффективность риелторов</a>
+    </div>
+</aside>

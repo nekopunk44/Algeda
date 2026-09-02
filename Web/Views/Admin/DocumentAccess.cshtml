@@ -1,0 +1,205 @@
+﻿@model Web.Models.Dashboard.AdminDealDocumentAccessLogViewModel
+@using Web.Models.Dashboard
+@{
+    ViewData["Title"] = "Доступ к документам";
+    var activeMenu = (string?)ViewData["AdminActive"] ?? string.Empty;
+
+    string ActionLabel(string value)
+    {
+        return value switch
+        {
+            "Added" => "Добавление",
+            "Opened" => "Открытие",
+            "Deleted" => "Удаление",
+            _ => value
+        };
+    }
+
+    string ActionBadgeClass(string value)
+    {
+        return value switch
+        {
+            "Added" => "bg-success-subtle text-success-emphasis border",
+            "Opened" => "bg-primary-subtle text-primary-emphasis border",
+            "Deleted" => "bg-danger-subtle text-danger-emphasis border",
+            _ => "bg-light text-dark border"
+        };
+    }
+}
+
+<div class="row g-3">
+    <div class="col-xl-3 col-lg-4">
+        <partial name="_Sidebar" model="activeMenu" />
+    </div>
+    <div class="col-xl-9 col-lg-8">
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <h1 class="h4 mb-1">Доступ к документам</h1>
+                <div class="text-muted">История открытия, добавления и удаления документов по сделкам.</div>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">@Model.SuccessMessage</div>
+        }
+
+        @if (Model.ApiError is not null)
+        {
+            <partial name="_ApiErrorAlert" model="Model.ApiError" />
+        }
+
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <form asp-action="DocumentAccess" method="get" class="row g-2 align-items-end">
+                    <div class="col-md-2">
+                        <label class="form-label">С даты</label>
+                        <input type="date" name="dateFrom" class="form-control" value="@Model.DateFrom" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">По дату</label>
+                        <input type="date" name="dateTo" class="form-control" value="@Model.DateTo" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Действие</label>
+                        <select name="action" class="form-select">
+                            <option value="">Все действия</option>
+                            <option value="Opened" selected="@(Model.Action == "Opened")">Открытие</option>
+                            <option value="Added" selected="@(Model.Action == "Added")">Добавление</option>
+                            <option value="Deleted" selected="@(Model.Action == "Deleted")">Удаление</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Сделка</label>
+                        <input type="text" name="dealId" class="form-control" value="@Model.DealId" placeholder="ID сделки" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Поиск</label>
+                        <input type="text" name="search" class="form-control" value="@Model.Search" placeholder="Документ, пользователь, email" />
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="submit" class="btn btn-outline-primary">Применить</button>
+                        <a asp-action="DocumentAccess" class="btn btn-outline-secondary">Сбросить</a>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-body">
+                @if (Model.Items.Count == 0)
+                {
+                    <div class="alert alert-light border mb-0">Записи доступа не найдены.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle admin-comfort-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 150px;">Действие</th>
+                                    <th style="min-width: 250px;">Документ</th>
+                                    <th style="min-width: 240px;">Пользователь</th>
+                                    <th style="min-width: 260px;">Сделка</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.Items)
+                                {
+                                    <tr>
+                                        <td>
+                                            <span class="badge rounded-pill @ActionBadgeClass(item.Action)">
+                                                @ActionLabel(item.Action)
+                                            </span>
+                                            <div class="small text-muted mt-1">@item.CreatedDate.ToString("dd.MM.yyyy HH:mm")</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold">@item.DocumentTitle</div>
+                                            <div class="small text-muted">@item.DocumentFileName</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold">
+                                                @item.ActorDisplayTitle
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(item.ActorEmail))
+                                            {
+                                                <div class="small text-muted">@item.ActorEmail</div>
+                                            }
+                                            <div class="small text-muted">Роль: @(string.IsNullOrWhiteSpace(item.ActorRole) ? "не указана" : item.ActorRole)</div>
+                                            @if (item.ActorUserId.HasValue)
+                                            {
+                                                <div class="small text-muted text-break">ID: @item.ActorUserId</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(item.IpAddress))
+                                            {
+                                                <div class="small text-muted">IP: @item.IpAddress</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            <a asp-controller="DealRequests"
+                                               asp-action="Details"
+                                               asp-route-id="@item.DealId"
+                                               asp-route-scope="mine"
+                                               class="btn btn-outline-primary btn-sm">
+                                                Открыть сделку (@DashboardValueDisplay.DealStatus(item.DealStatus))
+                                            </a>
+
+                                            @if (!string.IsNullOrWhiteSpace(item.PropertyTitle))
+                                            {
+                                                <div class="fw-semibold mt-2">@item.PropertyTitle</div>
+                                            }
+
+                                            <div class="small text-muted mt-1">
+                                                Клиент: @(string.IsNullOrWhiteSpace(item.ClientFullName) ? item.ClientSummary : item.ClientFullName)
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(item.ClientPhoneNumber))
+                                            {
+                                                <div class="small text-muted">@item.ClientPhoneNumber</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(item.ClientEmail))
+                                            {
+                                                <div class="small text-muted">@item.ClientEmail</div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <nav class="mt-3" aria-label="Навигация по журналу доступа">
+                        <ul class="pagination mb-0">
+                            <li class="page-item @(Model.Page <= 1 ? "disabled" : string.Empty)">
+                                <a class="page-link"
+                                   asp-action="DocumentAccess"
+                                   asp-route-dateFrom="@Model.DateFrom"
+                                   asp-route-dateTo="@Model.DateTo"
+                                   asp-route-action="@Model.Action"
+                                   asp-route-dealId="@Model.DealId"
+                                   asp-route-search="@Model.Search"
+                                   asp-route-page="@(Model.Page - 1)">
+                                    Назад
+                                </a>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">@Model.Page из @Model.TotalPages</span>
+                            </li>
+                            <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : string.Empty)">
+                                <a class="page-link"
+                                   asp-action="DocumentAccess"
+                                   asp-route-dateFrom="@Model.DateFrom"
+                                   asp-route-dateTo="@Model.DateTo"
+                                   asp-route-action="@Model.Action"
+                                   asp-route-dealId="@Model.DealId"
+                                   asp-route-search="@Model.Search"
+                                   asp-route-page="@(Model.Page + 1)">
+                                    Вперёд
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                }
+            </div>
+        </section>
+    </div>
+</div>

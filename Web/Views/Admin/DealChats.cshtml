@@ -1,0 +1,141 @@
+﻿@model Web.Models.Dashboard.AdminDealChatsViewModel
+@using Web.Models.Dashboard
+@{
+    ViewData["Title"] = "Чаты по сделкам";
+    var activeMenu = (string?)ViewData["AdminActive"] ?? string.Empty;
+}
+
+<div class="row g-3">
+    <div class="col-xl-3 col-lg-4">
+        <partial name="_Sidebar" model="activeMenu" />
+    </div>
+    <div class="col-xl-9 col-lg-8">
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <h1 class="h4 mb-1">Чаты по сделкам</h1>
+                <div class="text-muted">Переписки клиентов и риелторов, сгруппированные по сделкам.</div>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">@Model.SuccessMessage</div>
+        }
+
+        @if (Model.ApiError is not null)
+        {
+            <partial name="_ApiErrorAlert" model="Model.ApiError" />
+        }
+
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <form asp-action="DealChats" method="get" class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Сделка</label>
+                        <input type="text"
+                               name="dealId"
+                               class="form-control"
+                               value="@Model.FilterDealId"
+                               placeholder="ID сделки" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Клиент</label>
+                        <input type="text"
+                               name="client"
+                               class="form-control"
+                               value="@Model.FilterClientQuery"
+                               placeholder="ФИО, телефон, email или ID" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Риелтор</label>
+                        <input type="text"
+                               name="realtor"
+                               class="form-control"
+                               value="@Model.FilterRealtorQuery"
+                               placeholder="ФИО, телефон, email или ID" />
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="submit" class="btn btn-outline-primary">Применить</button>
+                        <a asp-action="DealChats" class="btn btn-outline-secondary">Сбросить</a>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-body">
+                @if (Model.Items.Count == 0)
+                {
+                    <div class="alert alert-light border mb-0">Чаты не найдены.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle admin-comfort-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="admin-col-deal">Сделка</th>
+                                    <th style="min-width: 230px;">Клиент</th>
+                                    <th style="min-width: 230px;">Риелтор</th>
+                                    <th class="text-nowrap">Статус</th>
+                                    <th style="min-width: 190px;">Чат</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.Items)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold text-dark">
+                                                @(string.IsNullOrWhiteSpace(item.PropertyTitle) ? "Объект не указан" : item.PropertyTitle)
+                                            </div>
+                                            <div class="small text-muted text-break">ID: @item.DealId</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold">@(item.ClientName ?? "Клиент")</div>
+                                            @if (!string.IsNullOrWhiteSpace(item.ClientPhoneNumber))
+                                            {
+                                                <div class="small text-muted">@item.ClientPhoneNumber</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(item.ClientEmail))
+                                            {
+                                                <div class="small text-muted">@item.ClientEmail</div>
+                                            }
+                                            <div class="small text-muted">ID: @item.ClientId</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold">@(item.RealtorName ?? "Риелтор")</div>
+                                            @if (!string.IsNullOrWhiteSpace(item.RealtorPhoneNumber))
+                                            {
+                                                <div class="small text-muted">@item.RealtorPhoneNumber</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(item.RealtorEmail))
+                                            {
+                                                <div class="small text-muted">@item.RealtorEmail</div>
+                                            }
+                                            <div class="small text-muted">ID: @item.RealtorId</div>
+                                        </td>
+                                        <td class="text-nowrap">@DashboardValueDisplay.DealStatus(item.DealStatus)</td>
+                                        <td>
+                                            <a asp-controller="DealChat"
+                                               asp-action="Deal"
+                                               asp-route-dealId="@item.DealId"
+                                               asp-route-returnUrl="@Url.Action("DealChats", "Admin", new { dealId = Model.FilterDealId, client = Model.FilterClientQuery, realtor = Model.FilterRealtorQuery })"
+                                               class="btn btn-outline-primary btn-sm mb-2">
+                                                Открыть чат
+                                            </a>
+                                            <div class="small text-muted">Последнее сообщение:</div>
+                                            <div class="small">
+                                                @(item.LastMessageAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет сообщений")
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+</div>

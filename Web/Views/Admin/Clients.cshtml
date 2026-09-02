@@ -1,0 +1,128 @@
+﻿@model Web.Models.Dashboard.AdminClientsViewModel
+@{
+    ViewData["Title"] = "Клиенты";
+    var activeMenu = (string?)ViewData["AdminActive"] ?? string.Empty;
+}
+
+<div class="row g-3">
+    <div class="col-xl-3 col-lg-4">
+        <partial name="_Sidebar" model="activeMenu" />
+    </div>
+    <div class="col-xl-9 col-lg-8">
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <div>
+                        <h1 class="h4 mb-1">Клиенты</h1>
+                        <div class="text-muted">Отдельный раздел управления клиентскими профилями.</div>
+                    </div>
+                </div>
+
+                <form method="get" asp-action="Clients" class="row g-2 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label">Поиск</label>
+                        <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="ФИО, email, телефон" />
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="submit" class="btn btn-primary">Найти</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">@Model.SuccessMessage</div>
+        }
+
+        @if (Model.ApiError is not null)
+        {
+            <partial name="_ApiErrorAlert" model="Model.ApiError" />
+        }
+
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Создать клиента</h2>
+                <form asp-action="CreateClient" method="post" class="row g-2">
+                    @Html.AntiForgeryToken()
+                    <div class="col-md-4">
+                        <label class="form-label">Фамилия</label>
+                        <input type="text" name="lastName" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Имя</label>
+                        <input type="text" name="firstName" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Отчество</label>
+                        <input type="text" name="middleName" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Телефон</label>
+                        <input type="text" name="phoneNumber" class="form-control" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" />
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Создать</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Список клиентов</h2>
+                @if (Model.Clients.Count == 0)
+                {
+                    <div class="alert alert-light border mb-0">Клиенты не найдены.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Клиент</th>
+                                    <th>Телефон</th>
+                                    <th>Email</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var client in Model.Clients)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@client.FullName</div>
+                                            <div class="small text-muted">Создан: @client.CreatedDate.ToLocalTime().ToString("yyyy-MM-dd")</div>
+                                        </td>
+                                        <td>@client.PhoneNumber</td>
+                                        <td>@(client.Email ?? "—")</td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <form asp-action="UpdateClient" method="post" class="d-flex gap-2">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="clientId" value="@client.Id" />
+                                                    <input type="text" name="phoneNumber" value="@client.PhoneNumber" class="form-control form-control-sm" style="max-width:180px;" required />
+                                                    <button type="submit" class="btn btn-outline-primary btn-sm">Обновить</button>
+                                                </form>
+                                                <form asp-action="DeleteClient" method="post" onsubmit="return confirm('Удалить клиента?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="clientId" value="@client.Id" />
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+</div>

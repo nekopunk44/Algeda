@@ -1,0 +1,24 @@
+{
+  "dotnet.defaultSolution": "Algeda.slnx",
+  "files.watcherExclude": {
+    "**/bin/**": true,
+    "**/obj/**": true,
+    "Mobile/.dart_tool/**": true,
+    "Mobile/build/**": true,
+    "Mobile/android/.gradle/**": true
+  },
+  "search.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "Mobile/.dart_tool": true,
+    "Mobile/build": true,
+    "Mobile/android/.gradle": true
+  },
+  "files.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "Mobile/.dart_tool": true,
+    "Mobile/build": true,
+    "Mobile/android/.gradle": true
+  }
+}

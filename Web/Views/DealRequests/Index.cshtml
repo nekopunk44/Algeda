@@ -1,0 +1,275 @@
+﻿@model Web.Models.DealRequests.DealRequestsIndexViewModel
+@using Web.Models.DealRequests
+@{
+    ViewData["Title"] = "Заявки";
+
+    var filters = Model.Filters;
+    var currentScope = string.Equals(filters.Scope, "mine", StringComparison.OrdinalIgnoreCase)
+        ? "mine"
+        : "incoming";
+    var mineTabLabel = Model.IsAdmin ? "Все" : "Мои";
+    var currentSource = string.Equals(filters.Source, "sale", StringComparison.OrdinalIgnoreCase)
+        ? "sale"
+        : string.Equals(filters.Source, "purchase", StringComparison.OrdinalIgnoreCase)
+            ? "purchase"
+            : "all";
+    var statuses = new[] { "Created", "InProgress", "Completed", "Cancelled" };
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Заявки</h1>
+        <span class="text-muted small">Найдено: @Model.TotalCount</span>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-4">
+        <ul class="nav nav-pills mb-3">
+            <li class="nav-item">
+                <a class="nav-link @(currentSource == "all" ? "active" : null)"
+                   asp-action="Index"
+                   asp-route-source="all"
+                   asp-route-scope="@currentScope"
+                   asp-route-search="@filters.Search"
+                   asp-route-status="@filters.Status"
+                   asp-route-page="1"
+                   asp-route-pageSize="@filters.PageSize">Все заявки</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @(currentSource == "sale" ? "active" : null)"
+                   asp-action="Index"
+                   asp-route-source="sale"
+                   asp-route-scope="@currentScope"
+                   asp-route-search="@filters.Search"
+                   asp-route-status="@filters.Status"
+                   asp-route-page="1"
+                   asp-route-pageSize="@filters.PageSize">Продажа недвижимости</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @(currentSource == "purchase" ? "active" : null)"
+                   asp-action="Index"
+                   asp-route-source="purchase"
+                   asp-route-scope="@currentScope"
+                   asp-route-search="@filters.Search"
+                   asp-route-status="@filters.Status"
+                   asp-route-page="1"
+                   asp-route-pageSize="@filters.PageSize">Покупка недвижимости</a>
+            </li>
+        </ul>
+
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link @(currentScope == "incoming" ? "active" : null)"
+                   asp-action="Index"
+                   asp-route-scope="incoming"
+                   asp-route-source="@currentSource"
+                   asp-route-search="@filters.Search"
+                   asp-route-status="@filters.Status"
+                   asp-route-page="1"
+                   asp-route-pageSize="@filters.PageSize">Входящие</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @(currentScope == "mine" ? "active" : null)"
+                   asp-action="Index"
+                   asp-route-scope="mine"
+                   asp-route-source="@currentSource"
+                   asp-route-search="@filters.Search"
+                   asp-route-status="@filters.Status"
+                   asp-route-page="1"
+                   asp-route-pageSize="@filters.PageSize">@mineTabLabel</a>
+            </li>
+        </ul>
+
+        <form asp-action="Index" method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="scope" value="@currentScope" />
+            <input type="hidden" name="source" value="@currentSource" />
+            <div class="col-lg-5 col-md-6">
+                <label class="form-label">Поиск по клиенту</label>
+                <input type="text"
+                       name="search"
+                       class="form-control"
+                       value="@filters.Search"
+                       placeholder="ФИО, телефон или email" />
+            </div>
+            <div class="col-lg-3 col-md-3">
+                <label class="form-label">Статус</label>
+                <select name="status" class="form-select">
+                    <option value="">Все</option>
+                    @foreach (var itemStatus in statuses)
+                    {
+                        <option value="@itemStatus" selected="@(string.Equals(itemStatus, filters.Status, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">
+                            @DealRequestValueDisplay.Status(itemStatus)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-3">
+                <label class="form-label">На стр.</label>
+                <select name="pageSize" class="form-select">
+                    @foreach (var size in new[] { 20, 50, 100 })
+                    {
+                        <option value="@size" selected="@(size == filters.PageSize ? "selected" : null)">@size</option>
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-12 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-primary w-100">Применить</button>
+                <a asp-action="Index" asp-route-scope="@currentScope" asp-route-source="@currentSource" class="btn btn-outline-secondary">Сброс</a>
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-4">
+        <div class="row g-2">
+            @foreach (var count in Model.StatusCounts)
+            {
+                <div class="col-md-3 col-sm-6">
+                    <div class="border rounded-3 p-3 h-100">
+                        <div class="small text-muted">@DealRequestValueDisplay.Status(count.Status)</div>
+                        <div class="h4 mb-0">@count.Count</div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        @if (Model.Items.Count == 0)
+        {
+            <div class="alert alert-light border mb-0">По текущим фильтрам заявки не найдены.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>Клиент</th>
+                        <th>Объект</th>
+                        <th>Источник</th>
+                        <th>Статус</th>
+                        <th>Риелтор</th>
+                        <th>Дата</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        var unreadCount = Model.GetUnreadCount(item.Id);
+                        var hasActivePriority = item.PriorityRealtorId.HasValue
+                            && item.PriorityUntilUtc.HasValue
+                            && item.PriorityUntilUtc.Value > DateTime.UtcNow;
+                        <tr>
+                            <td style="min-width: 220px;">
+                                <div class="fw-semibold">@item.ClientFullName</div>
+                                <div class="small text-muted">@item.ClientPhoneNumber</div>
+                                @if (!string.IsNullOrWhiteSpace(item.ClientEmail))
+                                {
+                                    <div class="small text-muted">@item.ClientEmail</div>
+                                }
+                            </td>
+                            <td style="min-width: 220px;">
+                                @if (!string.IsNullOrWhiteSpace(item.PropertyTitle))
+                                {
+                                    <span>@item.PropertyTitle</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge rounded-pill text-bg-light border">@DealRequestValueDisplay.Source(item.Source)</span>
+                            </td>
+                            <td>
+                                <span class="badge rounded-pill @DealRequestValueDisplay.StatusBadgeClass(item.Status)">
+                                    @DealRequestValueDisplay.Status(item.Status)
+                                </span>
+                                @if (hasActivePriority)
+                                {
+                                    <div class="small text-muted mt-1">
+                                        Приоритет до @item.PriorityUntilUtc!.Value.ToString("dd.MM.yyyy HH:mm")
+                                    </div>
+                                }
+                            </td>
+                            <td style="min-width: 220px;">
+                                @if (!string.IsNullOrWhiteSpace(item.RealtorFullName))
+                                {
+                                    <div class="fw-semibold">@item.RealtorFullName</div>
+                                    @if (!string.IsNullOrWhiteSpace(item.RealtorPhoneNumber))
+                                    {
+                                        <div class="small text-muted">@item.RealtorPhoneNumber</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.RealtorEmail))
+                                    {
+                                        <div class="small text-muted">@item.RealtorEmail</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="text-nowrap">@item.CreatedDate.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td class="text-nowrap">
+                                <a asp-action="Details"
+                                   asp-route-id="@item.Id"
+                                   asp-route-scope="@currentScope"
+                                   asp-route-source="@currentSource"
+                                   asp-route-search="@filters.Search"
+                                   asp-route-status="@filters.Status"
+                                   asp-route-page="@filters.Page"
+                                   asp-route-pageSize="@filters.PageSize"
+                                   class="btn btn-outline-primary btn-sm">Открыть</a>
+                                @if (unreadCount > 0)
+                                {
+                                    <span class="badge rounded-pill text-bg-primary ms-2" title="Есть непрочитанные сообщения">
+                                        @unreadCount
+                                    </span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPages > 1)
+            {
+                <nav class="mt-3" aria-label="Пагинация заявок">
+                    <ul class="pagination pagination-sm mb-0">
+                        @for (var p = 1; p <= Model.TotalPages; p++)
+                        {
+                            <li class="page-item @(p == filters.Page ? "active" : null)">
+                                <a class="page-link"
+                                   asp-action="Index"
+                                   asp-route-scope="@currentScope"
+                                   asp-route-source="@currentSource"
+                                   asp-route-search="@filters.Search"
+                                   asp-route-status="@filters.Status"
+                                   asp-route-page="@p"
+                                   asp-route-pageSize="@filters.PageSize">@p</a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            }
+        }
+    </div>
+</section>

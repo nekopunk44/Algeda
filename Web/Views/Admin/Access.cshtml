@@ -1,0 +1,236 @@
+﻿@model Web.Models.Dashboard.AdminAccessViewModel
+@{
+    ViewData["Title"] = "Управление доступом";
+    var activeMenu = (string?)ViewData["AdminActive"] ?? string.Empty;
+}
+
+<div class="row g-3">
+    <div class="col-xl-3 col-lg-4">
+        <partial name="_Sidebar" model="activeMenu" />
+    </div>
+    <div class="col-xl-9 col-lg-8">
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <h1 class="h4 mb-1">Управление доступом</h1>
+                <div class="text-muted mb-3">Список пользователей, управление ролями и заморозкой аккаунтов.</div>
+
+                <form method="get" asp-action="Access" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label">Поиск</label>
+                        <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="Email или имя" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Роль</label>
+                        <select name="role" class="form-select">
+                            <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Role) ? "selected" : null)">Все</option>
+                            <option value="Admin" selected="@(Model.Role == "Admin" ? "selected" : null)">Admin</option>
+                            <option value="SuperAdmin" selected="@(Model.Role == "SuperAdmin" ? "selected" : null)">SuperAdmin</option>
+                            <option value="Realtor" selected="@(Model.Role == "Realtor" ? "selected" : null)">Realtor</option>
+                            <option value="Client" selected="@(Model.Role == "Client" ? "selected" : null)">Client</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="submit" class="btn btn-primary">Применить</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">@Model.SuccessMessage</div>
+        }
+
+        @if (Model.ApiError is not null)
+        {
+            <partial name="_ApiErrorAlert" model="Model.ApiError" />
+        }
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-body">
+                @if (Model.Users.Count == 0)
+                {
+                    <div class="alert alert-light border mb-0">Пользователи не найдены.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Пользователь</th>
+                                    <th>Роли</th>
+                                    <th>Статус</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var user in Model.Users)
+                                {
+                                    var isSelf = user.UserId == Model.CurrentUserId;
+                                    var isAdminTarget = user.HasRole("Admin") || user.HasRole("SuperAdmin");
+                                    var canManageFreeze = !isSelf
+                                        && (Model.IsCurrentUserSuperAdmin
+                                            || (!isAdminTarget && (user.HasRole("Realtor") || user.HasRole("Client"))));
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@(string.IsNullOrWhiteSpace(user.DisplayName) ? "Без имени" : user.DisplayName)</div>
+                                            <div class="small text-muted">@user.Email</div>
+                                        </td>
+                                        <td>
+                                            @if (user.Roles.Count == 0)
+                                            {
+                                                <span class="badge bg-light text-dark border">Нет ролей</span>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var role in user.Roles)
+                                                {
+                                                    <span class="badge bg-primary-subtle text-primary-emphasis border me-1">@role</span>
+                                                }
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (user.IsFrozen)
+                                            {
+                                                <span class="badge text-bg-danger">Заморожен</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge text-bg-success">Активен</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                @if (Model.IsCurrentUserSuperAdmin)
+                                                {
+                                                    @if (user.HasRole("Admin"))
+                                                    {
+                                                        <form asp-action="RemoveRole" method="post">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="userId" value="@user.UserId" />
+                                                            <input type="hidden" name="role" value="Admin" />
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger">Снять Admin</button>
+                                                        </form>
+                                                    }
+                                                    else
+                                                    {
+                                                        <form asp-action="AssignRole" method="post">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="userId" value="@user.UserId" />
+                                                            <input type="hidden" name="role" value="Admin" />
+                                                            <button type="submit" class="btn btn-sm btn-outline-success">Назначить Admin</button>
+                                                        </form>
+                                                    }
+
+                                                    @if (!user.HasRole("SuperAdmin"))
+                                                    {
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-warning"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#transferSuperAdmin_@user.UserId">
+                                                            Сделать главным
+                                                        </button>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="small text-muted align-self-center">Admin меняет только главный администратор</span>
+                                                }
+
+                                                @if (user.HasRole("Realtor"))
+                                                {
+                                                    <form asp-action="RemoveRole" method="post">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="userId" value="@user.UserId" />
+                                                        <input type="hidden" name="role" value="Realtor" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">Снять Realtor</button>
+                                                    </form>
+                                                }
+                                                else
+                                                {
+                                                    <form asp-action="AssignRole" method="post">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="userId" value="@user.UserId" />
+                                                        <input type="hidden" name="role" value="Realtor" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-success">Назначить Realtor</button>
+                                                    </form>
+                                                }
+
+                                                @if (canManageFreeze)
+                                                {
+                                                    if (user.IsFrozen)
+                                                    {
+                                                        <form asp-action="UnfreezeAccount" method="post">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="userId" value="@user.UserId" />
+                                                            <button type="submit" class="btn btn-sm btn-outline-success">Разморозить</button>
+                                                        </form>
+                                                    }
+                                                    else
+                                                    {
+                                                        <form asp-action="FreezeAccount" method="post">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="userId" value="@user.UserId" />
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger">Заморозить</button>
+                                                        </form>
+                                                    }
+                                                }
+                                                else if (isSelf)
+                                                {
+                                                    <span class="small text-muted align-self-center">Свой аккаунт нельзя заморозить</span>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (Model.IsCurrentUserSuperAdmin)
+                    {
+                        @foreach (var user in Model.Users.Where(x => !x.HasRole("SuperAdmin")))
+                        {
+                            <div class="modal fade" id="transferSuperAdmin_@user.UserId" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h2 class="modal-title h5">Передать права главного администратора</h2>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                        </div>
+                                        <form asp-action="TransferSuperAdmin" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@user.UserId" />
+                                            <div class="modal-body">
+                                                <div class="alert alert-warning mb-3">
+                                                    Вы передаете права главного администратора пользователю
+                                                    <strong>@user.Email</strong>. После передачи вы останетесь обычным администратором.
+                                                </div>
+                                                <div class="form-check mb-3">
+                                                    <input class="form-check-input" type="checkbox" name="confirmed" value="true" id="confirmTransfer_@user.UserId" required />
+                                                    <label class="form-check-label" for="confirmTransfer_@user.UserId">Я понимаю, что потеряю права главного администратора</label>
+                                                </div>
+                                                <label class="form-label">Ваш пароль</label>
+                                                <div class="input-group password-input-group">
+                                                    <input type="password" name="password" class="form-control" required autocomplete="current-password" />
+                                                    <button class="btn btn-outline-secondary password-toggle" type="button" aria-label="Показать пароль" title="Показать пароль">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                                                <button type="submit" class="btn btn-warning">Передать права</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                }
+            </div>
+        </section>
+    </div>
+</div>

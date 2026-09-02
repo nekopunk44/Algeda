@@ -1,0 +1,463 @@
+﻿@model Web.Models.DealCenter.DealCenterDetailsViewModel
+@using Web.Models.DealRequests
+@using Web.Models.Properties
+@inject Web.Services.ICurrencyFormatter CurrencyFormatter
+@{
+    ViewData["Title"] = "Детали сделки";
+    var feedbackState = Model.FeedbackState;
+    var property = Model.Property;
+    var canShowPurchaseFeedback = feedbackState?.CanSubmit == true && feedbackState.IsPurchase;
+    var canShowSaleFeedback = feedbackState?.CanSubmit == true && feedbackState.IsSale;
+    var returnToDetailsUrl = Url.Action("Details", "DealCenter", new { id = Model.Deal?.Id, scope = Model.Scope, search = Model.Search, status = Model.Status });
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Детали сделки</h1>
+        <a asp-action="Index"
+           asp-route-scope="@Model.Scope"
+           asp-route-search="@Model.Search"
+           asp-route-status="@Model.Status"
+           class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>К списку
+        </a>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+@if (Model.Deal is null)
+{
+    <div class="alert alert-light border">Сделка не найдена.</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h2 class="h4 mb-0">Информация</h2>
+                        <span class="badge rounded-pill @DealRequestValueDisplay.StatusBadgeClass(Model.Deal.Status)">
+                            @DealRequestValueDisplay.Status(Model.Deal.Status)
+                        </span>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div class="small text-muted">ID сделки</div>
+                            <div class="text-break">@Model.Deal.Id</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted">Тип</div>
+                            <div>@(Model.IsSale ? "Продажа недвижимости" : "Покупка недвижимости")</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted">Объект</div>
+                            <div>@(string.IsNullOrWhiteSpace(Model.Deal.PropertyTitle) ? "Объект в обработке" : Model.Deal.PropertyTitle)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted">Риелтор</div>
+                            <div>@(string.IsNullOrWhiteSpace(Model.Deal.RealtorFullName) ? "Не назначен" : Model.Deal.RealtorFullName)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted">Дата создания</div>
+                            <div>@Model.Deal.CreatedDate.ToString("dd.MM.yyyy HH:mm")</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted">Завершена</div>
+                            <div>@(Model.Deal.CompletedAtUtc.HasValue ? Model.Deal.CompletedAtUtc.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—")</div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Deal.RequestMessage))
+                    {
+                        <hr />
+                        <div class="small text-muted">Комментарий</div>
+                        <div>@Model.Deal.RequestMessage</div>
+                    }
+                </div>
+            </section>
+
+            @if (property is not null)
+            {
+                var propertyGalleryPhotos = new List<string>();
+                if (property.PhotoPaths.Count > 0)
+                {
+                    foreach (var photoPath in property.PhotoPaths)
+                    {
+                        if (!string.IsNullOrWhiteSpace(photoPath))
+                        {
+                            propertyGalleryPhotos.Add(photoPath);
+                        }
+                    }
+                }
+
+                if (propertyGalleryPhotos.Count == 0 && !string.IsNullOrWhiteSpace(property.MainPhotoPath))
+                {
+                    propertyGalleryPhotos.Add(property.MainPhotoPath);
+                }
+
+                <section class="card border-0 shadow-sm mb-3">
+                    <div class="card-body p-4">
+                        <h2 class="h5 mb-3">Карточка объекта</h2>
+
+                        <div class="mb-3">
+                            <div class="small text-muted">Название</div>
+                            <div class="fw-semibold">@property.Title</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="small text-muted">Описание</div>
+                            <div class="mb-1"><span class="text-muted">Адрес:</span> @property.Address</div>
+                            <div class="mb-1"><span class="text-muted">Тип:</span> @PropertyValueDisplay.Type(property.Type)</div>
+                            <div class="mb-1"><span class="text-muted">Комнат:</span> @property.RoomsCount</div>
+                            <div class="mb-1"><span class="text-muted">Площадь:</span> @property.Area.ToString("N1") м²</div>
+                            <div><span class="text-muted">Цена:</span> @CurrencyFormatter.Format(property.OriginalPriceAmount, property.OriginalPriceCurrency)</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="small text-muted mb-2">Картинки</div>
+                            @if (propertyGalleryPhotos.Count == 0)
+                            {
+                                <div class="text-muted">Фотографии отсутствуют.</div>
+                            }
+                            else
+                            {
+                                <div id="dealCenterPropertyCarousel" class="carousel slide details-photo-carousel" data-bs-ride="false">
+                                    <div class="carousel-inner">
+                                        @for (var i = 0; i < propertyGalleryPhotos.Count; i++)
+                                        {
+                                            var photoPath = propertyGalleryPhotos[i];
+                                            <div class="carousel-item @(i == 0 ? "active" : null)">
+                                                <a href="@photoPath" target="_blank" rel="noopener noreferrer" class="d-block">
+                                                    <img src="@photoPath" alt="Фото объекта" class="d-block w-100 rounded border" />
+                                                </a>
+                                            </div>
+                                        }
+                                    </div>
+
+                                    @if (propertyGalleryPhotos.Count > 1)
+                                    {
+                                        <button class="carousel-control-prev" type="button" data-bs-target="#dealCenterPropertyCarousel" data-bs-slide="prev">
+                                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                            <span class="visually-hidden">Предыдущее фото</span>
+                                        </button>
+                                        <button class="carousel-control-next" type="button" data-bs-target="#dealCenterPropertyCarousel" data-bs-slide="next">
+                                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                            <span class="visually-hidden">Следующее фото</span>
+                                        </button>
+                                    }
+                                </div>
+
+                                @if (propertyGalleryPhotos.Count > 1)
+                                {
+                                    <div id="dealCenterPropertyThumbs" class="property-thumbs-strip mt-2">
+                                        @for (var i = 0; i < propertyGalleryPhotos.Count; i++)
+                                        {
+                                            var photoPath = propertyGalleryPhotos[i];
+                                            <button type="button"
+                                                    class="property-thumb-btn @(i == 0 ? "active" : null)"
+                                                    data-bs-target="#dealCenterPropertyCarousel"
+                                                    data-bs-slide-to="@i"
+                                                    aria-label="Фото @(i + 1)">
+                                                <img src="@photoPath" alt="Миниатюра фото объекта" class="rounded border" />
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div>
+                            <div class="small text-muted mb-2">Критерии</div>
+                            @if (property.Criteria.Count == 0)
+                            {
+                                <div class="text-muted">Критерии не указаны.</div>
+                            }
+                            else
+                            {
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var criterion in property.Criteria)
+                                    {
+                                        <li class="list-group-item px-0 d-flex justify-content-between">
+                                            <span>@criterion.DisplayName</span>
+                                            <span class="text-muted">@criterion.DisplayValue</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                </section>
+            }
+
+            <section class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Feedback по сделке</h2>
+
+                    @if (feedbackState is null)
+                    {
+                        <div class="alert alert-light border mb-0">Статус feedback недоступен.</div>
+                    }
+                    else if (!feedbackState.CanSubmit)
+                    {
+                        <div class="alert alert-light border mb-0">@(feedbackState.BlockReason ?? "Feedback недоступен для этой сделки.")</div>
+                    }
+                    else
+                    {
+                        <div class="small text-muted mb-3">Осталось дней для отправки: @(feedbackState.DaysRemaining?.ToString() ?? "—")</div>
+
+                        <form asp-action="SubmitFeedback" method="post" class="row g-3">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@Model.Deal.Id" />
+                            <input type="hidden" name="scope" value="@Model.Scope" />
+                            <input type="hidden" name="search" value="@Model.Search" />
+                            <input type="hidden" name="status" value="@Model.Status" />
+                            <div class="col-12">
+                                <label class="form-label">Общая оценка работы риелтора</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @for (var score = 1; score <= 5; score++)
+                                    {
+                                        var inputId = $"serviceScore_{score}";
+                                        <input class="btn-check" type="radio" name="serviceScore" id="@inputId" value="@score" checked="@(score == 5 ? "checked" : null)" required />
+                                        <label class="btn btn-outline-primary rating-score-btn" for="@inputId">@score</label>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Коммуникация</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @for (var score = 1; score <= 5; score++)
+                                    {
+                                        var inputId = $"communicationScore_{score}";
+                                        <input class="btn-check" type="radio" name="communicationScore" id="@inputId" value="@score" checked="@(score == 5 ? "checked" : null)" />
+                                        <label class="btn btn-outline-primary rating-score-btn" for="@inputId">@score</label>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Скорость реакции</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @for (var score = 1; score <= 5; score++)
+                                    {
+                                        var inputId = $"responsivenessScore_{score}";
+                                        <input class="btn-check" type="radio" name="responsivenessScore" id="@inputId" value="@score" checked="@(score == 5 ? "checked" : null)" />
+                                        <label class="btn btn-outline-primary rating-score-btn" for="@inputId">@score</label>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Экспертность</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @for (var score = 1; score <= 5; score++)
+                                    {
+                                        var inputId = $"expertiseScore_{score}";
+                                        <input class="btn-check" type="radio" name="expertiseScore" id="@inputId" value="@score" checked="@(score == 5 ? "checked" : null)" />
+                                        <label class="btn btn-outline-primary rating-score-btn" for="@inputId">@score</label>
+                                    }
+                                </div>
+                            </div>
+@if (canShowPurchaseFeedback)
+                            {
+                                <div class="col-12">
+                                    <div class="fw-semibold mb-2">Соответствует ли информация действительности?</div>
+                                    <div class="table-responsive">
+                                        <table class="table align-middle mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Элемент карточки</th>
+                                                    <th class="text-nowrap">Оценка</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>Название</td>
+                                                    <td>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            @for (var score = 1; score <= 5; score++)
+                                                            {
+                                                                var inputId = $"titleAccuracyScore_{score}";
+                                                                <input class="btn-check" type="radio" name="titleAccuracyScore" id="@inputId" value="@score" checked="@(score == 5 ? "checked" : null)" required />
+                                                                <label class="btn btn-outline-primary rating-score-btn" for="@inputId">@score</label>
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Описание</td>
+                                                    <td>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            @for (var score = 1; score <= 5; score++)
+                                                            {
+                                                                var inputId = $"descriptionAccuracyScore_{score}";
+                                                                <input class="btn-check" type="radio" name="descriptionAccuracyScore" id="@inputId" value="@score" checked="@(score == 5 ? "checked" : null)" required />
+                                                                <label class="btn btn-outline-primary rating-score-btn" for="@inputId">@score</label>
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Картинки</td>
+                                                    <td>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            @for (var score = 1; score <= 5; score++)
+                                                            {
+                                                                var inputId = $"photosAccuracyScore_{score}";
+                                                                <input class="btn-check" type="radio" name="photosAccuracyScore" id="@inputId" value="@score" checked="@(score == 5 ? "checked" : null)" required />
+                                                                <label class="btn btn-outline-primary rating-score-btn" for="@inputId">@score</label>
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Критерии</td>
+                                                    <td>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            @for (var score = 1; score <= 5; score++)
+                                                            {
+                                                                var inputId = $"criteriaAccuracyScore_{score}";
+                                                                <input class="btn-check" type="radio" name="criteriaAccuracyScore" id="@inputId" value="@score" checked="@(score == 5 ? "checked" : null)" required />
+                                                                <label class="btn btn-outline-primary rating-score-btn" for="@inputId">@score</label>
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            }
+                            else if (canShowSaleFeedback)
+                            {
+                                <div class="col-12">
+                                    <div class="alert alert-light border mb-0">
+                                        Для сделки продажи заполняется только оценка работы риелтора.
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="col-12">
+                                <label class="form-label">Комментарий</label>
+                                <textarea class="form-control" name="comment" rows="3" maxlength="4000" placeholder="Кратко: что было хорошо и что улучшить"></textarea>
+                            </div>
+
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Отправить feedback</button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-4">
+            <section class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Связь по сделке</h2>
+                    <div class="d-grid gap-2">
+                        @if (Model.Deal.RealtorId.HasValue && Model.Deal.RealtorId.Value != Guid.Empty)
+                        {
+                            <a asp-controller="DealChat"
+                               asp-action="Deal"
+                               asp-route-dealId="@Model.Deal.Id"
+                               asp-route-returnUrl="@returnToDetailsUrl"
+                               class="btn btn-outline-primary">
+                                Открыть чат
+                            </a>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-primary" disabled title="Чат станет доступен после назначения риелтора">Открыть чат</button>
+                        }
+
+                        <a asp-action="Complaint"
+                           asp-route-source="deal"
+                           asp-route-dealId="@Model.Deal.Id"
+                           asp-route-scope="@Model.Scope"
+                           asp-route-search="@Model.Search"
+                           asp-route-status="@Model.Status"
+                           asp-route-returnUrl="@returnToDetailsUrl"
+                           class="btn btn-outline-danger">
+                            Отправить жалобу
+                        </a>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <style>
+        .rating-score-btn {
+            min-width: 2.3rem;
+            padding: .3rem .7rem;
+            font-size: .9rem;
+            line-height: 1.2;
+        }
+    </style>
+
+    <script>
+        (function () {
+            const carouselElement = document.getElementById("dealCenterPropertyCarousel");
+            const thumbsContainer = document.getElementById("dealCenterPropertyThumbs");
+
+            if (!carouselElement || !thumbsContainer) {
+                return;
+            }
+
+            const thumbButtons = Array.from(thumbsContainer.querySelectorAll(".property-thumb-btn"));
+            if (thumbButtons.length === 0) {
+                return;
+            }
+
+            function activateThumb(index) {
+                thumbButtons.forEach((button, buttonIndex) => {
+                    const isActive = buttonIndex === index;
+                    button.classList.toggle("active", isActive);
+                    button.setAttribute("aria-current", isActive ? "true" : "false");
+                    if (isActive) {
+                        button.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+                    }
+                });
+            }
+
+            const currentSlide = carouselElement.querySelector(".carousel-item.active");
+            if (currentSlide) {
+                const initialIndex = Array.from(carouselElement.querySelectorAll(".carousel-item")).indexOf(currentSlide);
+                if (initialIndex >= 0) {
+                    activateThumb(initialIndex);
+                }
+            }
+
+            carouselElement.addEventListener("slid.bs.carousel", (event) => {
+                const nextIndex = Number(event.to);
+                if (!Number.isFinite(nextIndex)) {
+                    return;
+                }
+
+                activateThumb(nextIndex);
+            });
+
+            thumbButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    const targetIndex = Number(button.getAttribute("data-bs-slide-to"));
+                    if (!Number.isFinite(targetIndex)) {
+                        return;
+                    }
+
+                    activateThumb(targetIndex);
+                });
+            });
+        })();
+    </script>
+}

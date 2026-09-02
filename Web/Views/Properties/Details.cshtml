@@ -1,0 +1,294 @@
+@model Web.Models.Properties.PropertyDetailsViewModel
+@using Web.Models.Properties
+@inject Web.Services.ICurrencyFormatter CurrencyFormatter
+@{
+    ViewData["Title"] = "Детали объекта";
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">Карточка объекта</h1>
+        @if (Model.UseHistoryBack)
+        {
+            <a href="@Model.BackUrl"
+               class="btn btn-outline-secondary btn-sm"
+               onclick="if (window.history.length > 1) { window.history.back(); return false; }">
+                <i class="bi bi-arrow-left me-1"></i> Вернуться к карте
+            </a>
+        }
+        else
+        {
+            <a href="@Model.BackUrl" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Вернуться к карте
+            </a>
+        }
+    </div>
+</section>
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.Property is null)
+{
+    <div class="alert alert-light border">
+        Объект недоступен. Попробуйте открыть карточку снова из каталога.
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                        <h2 class="h4 mb-0">@Model.Property.Title</h2>
+                        <span class="badge rounded-pill text-bg-primary px-3 py-2">
+                            @CurrencyFormatter.Format(Model.Property.Price)
+                        </span>
+                    </div>
+
+                    <p class="text-muted mb-4">
+                        <i class="bi bi-geo-alt me-1"></i> @Model.Property.Address
+                    </p>
+
+                    @{
+                        var galleryPhotos = new List<string>();
+
+                        if (Model.Property.PhotoPaths.Count > 0)
+                        {
+                            foreach (var photoPath in Model.Property.PhotoPaths)
+                            {
+                                if (!string.IsNullOrWhiteSpace(photoPath))
+                                {
+                                    galleryPhotos.Add(photoPath);
+                                }
+                            }
+                        }
+
+                        if (galleryPhotos.Count == 0 && !string.IsNullOrWhiteSpace(Model.Property.MainPhotoPath))
+                        {
+                            galleryPhotos.Add(Model.Property.MainPhotoPath);
+                        }
+                    }
+
+                    @if (galleryPhotos.Count > 0)
+                    {
+                        <div class="mb-4">
+                            <div id="propertyDetailsCarousel" class="carousel slide details-photo-carousel" data-bs-ride="false">
+                                <div class="carousel-inner">
+                                    @for (var i = 0; i < galleryPhotos.Count; i++)
+                                    {
+                                        var photoPath = galleryPhotos[i];
+                                        <div class="carousel-item @(i == 0 ? "active" : null)">
+                                            <a href="@photoPath" target="_blank" rel="noopener noreferrer" class="d-block">
+                                                <img src="@photoPath" alt="Фото объекта" class="d-block w-100 rounded border" />
+                                            </a>
+                                        </div>
+                                    }
+                                </div>
+
+                                @if (galleryPhotos.Count > 1)
+                                {
+                                    <button class="carousel-control-prev" type="button" data-bs-target="#propertyDetailsCarousel" data-bs-slide="prev">
+                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Предыдущее фото</span>
+                                    </button>
+                                    <button class="carousel-control-next" type="button" data-bs-target="#propertyDetailsCarousel" data-bs-slide="next">
+                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Следующее фото</span>
+                                    </button>
+                                }
+                            </div>
+
+                            @if (galleryPhotos.Count > 1)
+                            {
+                                <div id="propertyDetailsThumbs" class="property-thumbs-strip mt-2">
+                                    @for (var i = 0; i < galleryPhotos.Count; i++)
+                                    {
+                                        var photoPath = galleryPhotos[i];
+                                        <button type="button"
+                                                class="property-thumb-btn @(i == 0 ? "active" : null)"
+                                                data-bs-target="#propertyDetailsCarousel"
+                                                data-bs-slide-to="@i"
+                                                aria-label="Фото @(i + 1)">
+                                            <img src="@photoPath" alt="Миниатюра фото объекта" class="rounded border" />
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <div class="row g-2 mb-4">
+                        <div class="col-sm-6 col-md-3">
+                            <div class="detail-chip">
+                                <div class="small text-muted">Площадь</div>
+                                <div class="fw-semibold">@Model.Property.Area.ToString("N1") м²</div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <div class="detail-chip">
+                                <div class="small text-muted">Комнат</div>
+                                <div class="fw-semibold">@Model.Property.RoomsCount</div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <div class="detail-chip">
+                                <div class="small text-muted">Тип</div>
+                                <div class="fw-semibold">@PropertyValueDisplay.Type(Model.Property.Type)</div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <div class="detail-chip">
+                                <div class="small text-muted">Статус</div>
+                                <div class="fw-semibold">@PropertyValueDisplay.Status(Model.Property.Status)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        @if (User.IsInRole("Client"))
+                        {
+                            <form asp-action="SubmitDealRequest" method="post" class="m-0">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="propertyId" value="@Model.Property.Id" />
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send me-1"></i> Подать заявку
+                                </button>
+                            </form>
+                            <a asp-controller="DealCenter"
+                               asp-action="Complaint"
+                               asp-route-source="property"
+                               asp-route-propertyId="@Model.Property.Id"
+                               asp-route-returnUrl="@($"{Context.Request.Path}{Context.Request.QueryString}")"
+                               class="btn btn-outline-danger">
+                                Пожаловаться на описание
+                            </a>
+                        }
+                        else if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <span class="text-muted small align-self-center">Заявку может подать только клиент.</span>
+                        }
+                        else
+                        {
+                            <a asp-controller="Auth" asp-action="Login" class="btn btn-primary">
+                                Войти, чтобы подать заявку
+                            </a>
+                            <a asp-controller="Auth" asp-action="Register" class="btn btn-outline-primary">
+                                Зарегистрироваться
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <h3 class="h5 mb-3">Доп. характеристики</h3>
+
+                    @if (Model.Criteria.Count == 0)
+                    {
+                        <div class="alert alert-light border mb-0">
+                            Дополнительные характеристики пока не заполнены.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="criteria-list">
+                            @foreach (var criterion in Model.Criteria)
+                            {
+                                <div class="criteria-item">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <div class="fw-semibold">@criterion.DisplayName</div>
+                                            @if (!string.IsNullOrWhiteSpace(criterion.Description))
+                                            {
+                                                <div class="small text-muted mt-1">@criterion.Description</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(criterion.Category))
+                                            {
+                                                <div class="small text-muted mt-1">@criterion.Category</div>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        @(string.IsNullOrWhiteSpace(criterion.DisplayValue)
+                                            ? PropertyValueDisplay.CriterionValue(criterion.Value, criterion.ValueType)
+                                            : criterion.DisplayValue)
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            const carouselElement = document.getElementById("propertyDetailsCarousel");
+            const thumbsContainer = document.getElementById("propertyDetailsThumbs");
+
+            if (!carouselElement || !thumbsContainer) {
+                return;
+            }
+
+            const thumbButtons = Array.from(thumbsContainer.querySelectorAll(".property-thumb-btn"));
+            if (thumbButtons.length === 0) {
+                return;
+            }
+
+            function activateThumb(index) {
+                thumbButtons.forEach((button, buttonIndex) => {
+                    const isActive = buttonIndex === index;
+                    button.classList.toggle("active", isActive);
+                    button.setAttribute("aria-current", isActive ? "true" : "false");
+                    if (isActive) {
+                        button.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+                    }
+                });
+            }
+
+            const currentSlide = carouselElement.querySelector(".carousel-item.active");
+            if (currentSlide) {
+                const initialIndex = Array.from(carouselElement.querySelectorAll(".carousel-item"))
+                    .indexOf(currentSlide);
+                if (initialIndex >= 0) {
+                    activateThumb(initialIndex);
+                }
+            }
+
+            carouselElement.addEventListener("slid.bs.carousel", (event) => {
+                const nextIndex = Number(event.to);
+                if (!Number.isFinite(nextIndex)) {
+                    return;
+                }
+
+                activateThumb(nextIndex);
+            });
+
+            thumbButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    const targetIndex = Number(button.getAttribute("data-bs-slide-to"));
+                    if (!Number.isFinite(targetIndex)) {
+                        return;
+                    }
+
+                    activateThumb(targetIndex);
+                });
+            });
+        })();
+    </script>
+}

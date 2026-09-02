@@ -1,0 +1,471 @@
+@model Web.Models.SellProperty.SellPropertyFormViewModel
+@using System.Text.Json
+@using Web.Models.DealRequests
+@{
+    var isEdit = Model.DealId.HasValue;
+    ViewData["Title"] = isEdit ? "Редактирование заявки на продажу" : "Продать недвижимость";
+
+    var initJson = JsonSerializer.Serialize(new
+    {
+        criteriaDefinitions = Model.CriterionDefinitions.Select(x => new
+        {
+            id = x.Id,
+            code = x.Code,
+            displayName = x.DisplayName,
+            category = x.Category,
+            description = x.Description,
+            valueType = x.ValueType,
+            options = x.Options
+                .OrderBy(o => o.SortOrder)
+                .ThenBy(o => o.Label)
+                .Select(o => new { value = o.Value, label = o.Label })
+        }),
+        selectedCriteria = Model.InitialCriteria.Select(x => new
+        {
+            criterionDefinitionId = x.CriterionDefinitionId,
+            value = x.Value,
+            values = x.Values
+        }),
+        latitude = Model.Form.Latitude,
+        longitude = Model.Form.Longitude
+    });
+}
+
+<section class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h1 class="h2 mb-0">@(isEdit ? "Заявка на продажу" : "Продать недвижимость")</h1>
+        @if (Model.IsManagedMode)
+        {
+            <a asp-controller="@Model.BackController"
+               asp-action="@Model.BackAction"
+               asp-route-id="@Model.DealId"
+               asp-route-scope="@Model.ReturnScope"
+               asp-route-source="@Model.ReturnSource"
+               asp-route-search="@Model.ReturnSearch"
+               asp-route-status="@Model.ReturnStatus"
+               asp-route-page="@Model.ReturnPage"
+               asp-route-pageSize="@Model.ReturnPageSize"
+               class="btn btn-outline-secondary btn-sm">К заявке</a>
+        }
+        else
+        {
+            <a asp-controller="@Model.BackController" asp-action="@Model.BackAction" class="btn btn-outline-secondary btn-sm">К списку заявок</a>
+        }
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+@if (isEdit)
+{
+    <section class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-4">
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <div class="small text-muted">Статус заявки</div>
+                    <span class="badge rounded-pill @DealRequestValueDisplay.StatusBadgeClass(Model.DealStatus)">
+                        @DealRequestValueDisplay.Status(Model.DealStatus)
+                    </span>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="small text-muted">ID заявки</div>
+                    <div class="text-break">@Model.DealId</div>
+                </div>
+            </div>
+        </section>
+
+    @if (Model.Lifecycle is not null)
+    {
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <div class="small text-muted">Этап продажи</div>
+                        <span class="badge rounded-pill @DealRequestValueDisplay.SaleLifecycleBadgeClass(Model.Lifecycle.Stage)">
+                            @DealRequestValueDisplay.SaleLifecycleStage(Model.Lifecycle.Stage)
+                        </span>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Lifecycle.Description))
+                {
+                    <div class="text-muted">@Model.Lifecycle.Description</div>
+                }
+
+                @if (Model.Lifecycle.BuyerDeal is not null)
+                {
+                    <hr class="my-3" />
+                    <div class="small text-muted mb-2">Покупатель</div>
+                    <div class="row g-3">
+                        <div class="col-md-6 col-lg-3">
+                            <div class="small text-muted">ФИО</div>
+                            <div>@Model.Lifecycle.BuyerDeal.BuyerFullName</div>
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <div class="small text-muted">Телефон</div>
+                            <div>@Model.Lifecycle.BuyerDeal.BuyerPhoneNumber</div>
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <div class="small text-muted">Email</div>
+                            <div>@(string.IsNullOrWhiteSpace(Model.Lifecycle.BuyerDeal.BuyerEmail) ? "—" : Model.Lifecycle.BuyerDeal.BuyerEmail)</div>
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <div class="small text-muted">Дата заявки покупателя</div>
+                            <div>@Model.Lifecycle.BuyerDeal.CreatedDate.ToString("dd.MM.yyyy HH:mm")</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+}
+<section class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        @if (!Model.CanEdit)
+        {
+            <div class="alert alert-light border mb-3">
+                Заявка уже обрабатывается. Редактирование недоступно.
+            </div>
+        }
+
+        <form asp-controller="@Model.SubmitController"
+              asp-action="@Model.SubmitAction"
+              asp-route-id="@Model.DealId"
+              method="post"
+              enctype="multipart/form-data"
+              id="sellPropertyForm"
+              class="row g-3"
+              data-explicit-submit="true">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="criteriaJson" name="criteriaJson" />
+
+            @if (Model.IsManagedMode)
+            {
+                <input type="hidden" name="scope" value="@Model.ReturnScope" />
+                <input type="hidden" name="source" value="@Model.ReturnSource" />
+                <input type="hidden" name="search" value="@Model.ReturnSearch" />
+                <input type="hidden" name="status" value="@Model.ReturnStatus" />
+                <input type="hidden" name="page" value="@Model.ReturnPage" />
+                <input type="hidden" name="pageSize" value="@Model.ReturnPageSize" />
+            }
+
+            <div class="col-lg-7">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label">Заголовок</label>
+                        <input type="text" name="title" class="form-control" value="@Model.Form.Title" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Тип</label>
+                        <select name="type" class="form-select" required>
+                            <option value="Apartment" selected="@(Model.Form.Type == "Apartment" ? "selected" : null)">Квартира</option>
+                            <option value="House" selected="@(Model.Form.Type == "House" ? "selected" : null)">Дом</option>
+                            <option value="Commercial" selected="@(Model.Form.Type == "Commercial" ? "selected" : null)">Коммерция</option>
+                            <option value="Land" selected="@(Model.Form.Type == "Land" ? "selected" : null)">Участок</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Адрес</label>
+                        <div class="input-group">
+                            <input type="text" id="addressInput" name="address" class="form-control" value="@Model.Form.Address" required />
+                            <button type="button" id="searchAddressButton" class="btn btn-outline-secondary">Найти на карте</button>
+                        </div>
+                        <div class="form-text" id="mapStatusText">Выберите точку на карте или введите адрес.</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Широта</label>
+                        <input type="number" id="latitudeInput" name="latitude" step="0.000001" class="form-control" value="@Model.Form.Latitude.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)" required />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Долгота</label>
+                        <input type="number" id="longitudeInput" name="longitude" step="0.000001" class="form-control" value="@Model.Form.Longitude.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)" required />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Цена (исходная)</label>
+                        <input type="number" name="price" min="1" step="1" class="form-control" value="@Model.Form.Price.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Валюта</label>
+                        <select name="priceCurrency" class="form-select" required>
+                            @if (Model.Currencies.Count == 0)
+                            {
+                                <option value="@Model.Form.PriceCurrency" selected>@Model.Form.PriceCurrency</option>
+                            }
+                            else
+                            {
+                                foreach (var currency in Model.Currencies.Where(x => x.IsActive).OrderBy(x => x.Code))
+                                {
+                                    <option value="@currency.Code" selected="@(currency.Code == Model.Form.PriceCurrency ? "selected" : null)">
+                                        @currency.Code (@currency.Symbol)
+                                    </option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Площадь, м²</label>
+                        <input type="number" name="area" min="1" step="0.1" class="form-control" value="@Model.Form.Area.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Комнат</label>
+                        <input type="number" name="roomsCount" min="1" class="form-control" value="@Model.Form.RoomsCount" required />
+                    </div>
+
+                    <div class="col-12">
+                        <div class="alert alert-secondary mb-0">
+                            Контакты собственника берутся из профиля аккаунта клиента.
+                            @if (isEdit)
+                            {
+                                <div class="mt-2 small">
+                                    <div>ФИО: @(string.IsNullOrWhiteSpace(Model.Form.OwnerFullName) ? "—" : Model.Form.OwnerFullName)</div>
+                                    <div>Email: @(string.IsNullOrWhiteSpace(Model.Form.OwnerEmail) ? "—" : Model.Form.OwnerEmail)</div>
+                                    <div>Телефон: @(string.IsNullOrWhiteSpace(Model.Form.OwnerPhoneNumber) ? "—" : Model.Form.OwnerPhoneNumber)</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Комментарий для риелтора</label>
+                        <textarea name="comment" class="form-control" rows="3">@Model.Comment</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <label class="form-label">Позиция на карте</label>
+                <div id="propertyMap" class="rounded border" style="min-height: 380px;"></div>
+            </div>
+
+            <div class="col-12">
+                <h2 class="h6 text-uppercase text-muted mb-2">Фотографии</h2>
+                <div id="retainPhotoInputs"></div>
+                @if (Model.ExistingPhotoPaths.Count > 0)
+                {
+                    <div class="small text-muted mb-2">
+                        Останется после сохранения: <span id="retainedPhotosCount">@Model.ExistingPhotoPaths.Count</span>
+                    </div>
+                    <div class="row g-2 mb-2" id="existingPhotosList">
+                        @foreach (var photoPath in Model.ExistingPhotoPaths)
+                        {
+                            <div class="col-sm-6 col-lg-4 js-photo-card" data-photo-path="@photoPath">
+                                <div class="border rounded p-2 h-100 d-flex flex-column">
+                                    <img src="@photoPath" alt="Фото объекта" class="w-100 rounded mb-2" style="height: 150px; object-fit: cover;" />
+                                    @if (Model.CanEdit)
+                                    {
+                                        <div class="btn-group btn-group-sm mb-2" role="group">
+                                            <button type="button" class="btn btn-outline-secondary js-photo-move-up">Вверх</button>
+                                            <button type="button" class="btn btn-outline-secondary js-photo-move-down">Вниз</button>
+                                            <button type="button" class="btn btn-outline-danger js-photo-delete">Удалить</button>
+                                        </div>
+                                        <div class="small text-danger d-none js-photo-delete-note">Будет удалено после сохранения</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <label class="form-label">@(isEdit ? "Добавить новые фото" : "Фото объекта (до 20 файлов)")</label>
+                <input type="file"
+                       name="@(isEdit ? "newPhotos" : "photos")"
+                       class="form-control"
+                       accept=".jpg,.jpeg,.png,.webp"
+                       multiple />
+            </div>
+
+            <div class="col-12">
+                <hr class="my-1" />
+                <h2 class="h5 mt-2 mb-3">Критерии объекта</h2>
+                <div class="row g-3">
+                    <div class="col-lg-8">
+                        <label class="form-label">Критерий</label>
+                        <div class="input-group">
+                            <input type="text" id="criterionSelectedName" class="form-control" value="Критерий не выбран" readonly />
+                            <button type="button" id="criterionOpenPickerButton" class="btn btn-outline-secondary">Выбрать</button>
+                        </div>
+                        <select id="criterionDefinitionSelect" class="d-none">
+                            <option value="">Выберите критерий</option>
+                            @foreach (var criterion in Model.CriterionDefinitions.OrderBy(x => x.DisplayName))
+                            {
+                                <option value="@criterion.Id">@criterion.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <div id="criterionEditor" class="border rounded p-3 bg-light-subtle">
+                            <span class="text-muted small">После выбора критерия появится поле ввода значения.</span>
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="button" id="addCriterionButton" class="btn btn-outline-primary">Добавить критерий</button>
+                    </div>
+                    <div class="col-12">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Критерий</th>
+                                        <th>Тип</th>
+                                        <th>Значение</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="selectedCriteriaBody">
+                                    <tr id="selectedCriteriaEmptyRow">
+                                        <td colspan="4" class="text-muted">Критерии пока не добавлены.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 d-flex flex-wrap gap-2">
+                @if (Model.CanEdit)
+                {
+                    <button type="submit" class="btn btn-primary">@Model.SubmitButtonText</button>
+                }
+
+                @if (Model.IsManagedMode)
+                {
+                    <a asp-controller="@Model.BackController"
+                       asp-action="@Model.BackAction"
+                       asp-route-id="@Model.DealId"
+                       asp-route-scope="@Model.ReturnScope"
+                       asp-route-source="@Model.ReturnSource"
+                       asp-route-search="@Model.ReturnSearch"
+                       asp-route-status="@Model.ReturnStatus"
+                       asp-route-page="@Model.ReturnPage"
+                       asp-route-pageSize="@Model.ReturnPageSize"
+                       class="btn btn-outline-secondary">Назад</a>
+                }
+                else
+                {
+                    <a asp-controller="@Model.BackController" asp-action="@Model.BackAction" class="btn btn-outline-secondary">Отмена</a>
+                }
+            </div>
+        </form>
+
+        @if (Model.CanEdit && !Model.IsManagedMode && isEdit && !string.Equals(Model.Lifecycle?.Stage, "DealCompleted", StringComparison.OrdinalIgnoreCase))
+        {
+            <form asp-action="Cancel" asp-route-id="@Model.DealId" method="post" class="mt-3" onsubmit="return confirm('Отменить заявку на продажу?');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-danger">Отменить заявку</button>
+            </form>
+        }
+    </div>
+</section>
+
+<div class="modal fade" id="criterionPickerModal" tabindex="-1" aria-labelledby="criterionPickerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="criterionPickerModalLabel">Выбор критерия</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="criterionSearchInput" class="form-control mb-3" placeholder="Поиск: код, название, категория..." />
+                <div class="mb-3">
+                    <label class="form-label" for="criterionCategoryFilter">Категория</label>
+                    <select id="criterionCategoryFilter" class="form-select">
+                        <option value="">Не важно</option>
+                    </select>
+                </div>
+                <div id="criterionPickerList" class="list-group"></div>
+                <nav class="mt-3" aria-label="Страницы критериев">
+                    <ul id="criterionPickerPagination" class="pagination pagination-sm mb-0 justify-content-center"></ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+}
+
+@section Scripts {
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="~/js/explicit-submit-form.js" asp-append-version="true"></script>
+    <script src="~/js/real-estate-form-map.js" asp-append-version="true"></script>
+    <script src="~/js/real-estate-create-criteria.js" asp-append-version="true"></script>
+    @if (Model.ExistingPhotoPaths.Count > 0 && Model.CanEdit)
+    {
+        <script src="~/js/real-estate-photo-editor.js" asp-append-version="true"></script>
+    }
+    <script>
+        const init = @Html.Raw(initJson);
+        window.realEstateFormMapInit({
+            mapElementId: "propertyMap",
+            latitudeInputId: "latitudeInput",
+            longitudeInputId: "longitudeInput",
+            addressInputId: "addressInput",
+            searchButtonId: "searchAddressButton",
+            statusElementId: "mapStatusText",
+            readOnly: @(Model.CanEdit ? "false" : "true"),
+            defaultLatitude: init.latitude,
+            defaultLongitude: init.longitude
+        });
+        window.realEstateCreateCriteriaInit({
+            formId: "sellPropertyForm",
+            definitions: init.criteriaDefinitions,
+            selectedCriteria: init.selectedCriteria,
+            criterionSearchInputId: "criterionSearchInput",
+            criterionCategoryFilterId: "criterionCategoryFilter",
+            criterionPickerListId: "criterionPickerList",
+            criterionPickerPaginationId: "criterionPickerPagination",
+            criterionPickerModalId: "criterionPickerModal",
+            criterionOpenPickerButtonId: "criterionOpenPickerButton",
+            criterionSelectedNameId: "criterionSelectedName",
+            criterionDefinitionSelectId: "criterionDefinitionSelect",
+            criterionEditorId: "criterionEditor",
+            addCriterionButtonId: "addCriterionButton",
+            selectedCriteriaBodyId: "selectedCriteriaBody",
+            selectedCriteriaEmptyRowId: "selectedCriteriaEmptyRow",
+            criteriaJsonInputId: "criteriaJson"
+        });
+
+        @if (Model.ExistingPhotoPaths.Count > 0 && Model.CanEdit)
+        {
+            <text>
+            window.realEstatePhotoEditorInit({
+                photosListId: "existingPhotosList",
+                retainInputsContainerId: "retainPhotoInputs",
+                retainedCountId: "retainedPhotosCount"
+            });
+            </text>
+        }
+
+        @if (!Model.CanEdit)
+        {
+            <text>
+            (() => {
+                const form = document.getElementById("sellPropertyForm");
+                if (!(form instanceof HTMLFormElement)) {
+                    return;
+                }
+
+                const controls = form.querySelectorAll("input, select, textarea, button");
+                controls.forEach((element) => {
+                    if (element instanceof HTMLInputElement && element.type === "hidden") {
+                        return;
+                    }
+
+                    element.disabled = true;
+                });
+            })();
+            </text>
+        }
+    </script>
+}

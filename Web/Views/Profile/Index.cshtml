@@ -1,0 +1,375 @@
+﻿@model Web.Models.Profile.ProfilePageViewModel
+@using Web.Models.Dashboard
+@inject Web.Services.ICurrencyFormatter CurrencyFormatter
+@{
+    ViewData["Title"] = "Аккаунт";
+    var profile = Model.Profile;
+    var avatarPath = !string.IsNullOrWhiteSpace(profile?.AvatarPath)
+        ? profile!.AvatarPath!
+        : Model.DefaultAvatarPath;
+}
+
+<section class="mb-4">
+    <h1 class="h2 mb-0">Аккаунт</h1>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.ApiError is not null)
+{
+    <partial name="_ApiErrorAlert" model="Model.ApiError" />
+}
+
+@if (profile is null)
+{
+    <div class="alert alert-light border">Не удалось загрузить данные аккаунта.</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-4">
+            <section class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4 text-center">
+                    <img src="@avatarPath" alt="Аватар" class="rounded-circle border" style="width: 148px; height: 148px; object-fit: cover;" />
+                    <div class="mt-3 fw-semibold fs-5">@profile.LastName @profile.FirstName @profile.MiddleName</div>
+                    <div class="small text-muted">@profile.Email</div>
+                    @if (profile.HasContactProfile)
+                    {
+                        <div class="small text-muted">@profile.PhoneNumber</div>
+                    }
+                    <div class="d-flex justify-content-center flex-wrap gap-2 my-3">
+                        @if (profile.IsAdmin)
+                        {
+                            <span class="badge text-bg-dark">Администратор</span>
+                        }
+                        @if (profile.IsRealtor)
+                        {
+                            <span class="badge text-bg-primary">Риелтор</span>
+                        }
+                        @if (profile.IsClient)
+                        {
+                            <span class="badge text-bg-secondary">Клиент</span>
+                        }
+                    </div>
+
+                    @if (profile.IsRealtor)
+                    {
+                        <div class="border rounded p-3 text-start mb-3">
+                            <div class="d-flex justify-content-between gap-2 mb-2">
+                                <span class="text-muted">Уровень</span>
+                                <strong>@DashboardValueDisplay.RealtorLevel(profile.RealtorLevel)</strong>
+                            </div>
+                            <div class="d-flex justify-content-between gap-2 mb-2">
+                                <span class="text-muted">Выплата</span>
+                                <strong>@((profile.RealtorCommissionPercent ?? 0m).ToString("0.##"))%</strong>
+                            </div>
+                            <div class="d-flex justify-content-between gap-2 mb-2">
+                                <span class="text-muted">За месяц</span>
+                                <strong>@CurrencyFormatter.Format(profile.RealtorPayoutThisMonth ?? 0m, profile.RealtorPayoutCurrency)</strong>
+                            </div>
+                            <div class="d-flex justify-content-between gap-2">
+                                <span class="text-muted">Всего</span>
+                                <strong>@CurrencyFormatter.Format(profile.RealtorPayoutTotal ?? 0m, profile.RealtorPayoutCurrency)</strong>
+                            </div>
+                        </div>
+
+                        <form asp-action="UploadAvatar" method="post" enctype="multipart/form-data" class="mb-2">
+                            @Html.AntiForgeryToken()
+                            <input type="file" name="avatar" class="form-control form-control-sm mb-2" accept="image/png,image/jpeg,image/webp" required />
+                            <button type="submit" class="btn btn-outline-primary btn-sm w-100">Загрузить фото</button>
+                        </form>
+
+                        <form asp-action="RemoveAvatar" method="post">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Удалить фото</button>
+                        </form>
+                    }
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-8">
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Данные профиля</h2>
+                    <form asp-action="UpdateProfile" method="post" class="row g-3">
+                        @Html.AntiForgeryToken()
+                        <div class="col-md-6">
+                            <label class="form-label">Фамилия</label>
+                            <input asp-for="EditForm.LastName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Имя</label>
+                            <input asp-for="EditForm.FirstName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Отчество</label>
+                            <input asp-for="EditForm.MiddleName" class="form-control" />
+                        </div>
+                        @if (profile.HasContactProfile)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label">Телефон</label>
+                                <input asp-for="EditForm.PhoneNumber" class="form-control" required />
+                            </div>
+                        }
+                        else
+                        {
+                            <input type="hidden" asp-for="EditForm.PhoneNumber" />
+                            <div class="col-md-6">
+                                <label class="form-label">Тип профиля</label>
+                                <div class="form-control bg-light text-muted">Аккаунт администратора</div>
+                            </div>
+                        }
+                        <div class="col-12">
+                            <label class="form-label">Email</label>
+                            <input asp-for="EditForm.Email" class="form-control" type="email" required />
+                            <div class="form-text">При смене email мы отправим код подтверждения на новый адрес.</div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Смена пароля</h2>
+                    <form asp-action="ChangePassword" method="post" class="row g-3">
+                        @Html.AntiForgeryToken()
+                        <div class="col-12">
+                            <label class="form-label">Текущий пароль</label>
+                            <div class="input-group password-input-group">
+                                <input asp-for="PasswordForm.CurrentPassword" class="form-control" type="password" autocomplete="current-password" required />
+                                <button class="btn btn-outline-secondary password-toggle" type="button" aria-label="Показать пароль" title="Показать пароль">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Новый пароль</label>
+                            <div class="input-group password-input-group">
+                                <input asp-for="PasswordForm.NewPassword" class="form-control" type="password" autocomplete="new-password" minlength="8" required />
+                                <button class="btn btn-outline-secondary password-toggle" type="button" aria-label="Показать пароль" title="Показать пароль">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Подтверждение</label>
+                            <div class="input-group password-input-group">
+                                <input asp-for="PasswordForm.ConfirmPassword" class="form-control" type="password" autocomplete="new-password" minlength="8" required />
+                                <button class="btn btn-outline-secondary password-toggle" type="button" aria-label="Показать пароль" title="Показать пароль">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-outline-primary">Изменить пароль</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section class="card border-0 shadow-sm mt-3">
+                <div class="card-body p-4">
+                    <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+                        <div>
+                            <h2 class="h5 mb-1">Текущие подключения</h2>
+                            <div class="text-muted small">Устройства, где сейчас открыт ваш аккаунт.</div>
+                        </div>
+                        <span class="badge rounded-pill text-bg-light align-self-md-start">@Model.Sessions.Count</span>
+                    </div>
+
+                    @if (Model.Sessions.Count == 0)
+                    {
+                        <div class="alert alert-light border mb-0">Активных подключений пока нет.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-2">
+                            @foreach (var session in Model.Sessions)
+                            {
+                                var modalId = $"endSessionModal-{session.Id:N}";
+                                <div class="border rounded-3 p-3">
+                                    <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                                        <div>
+                                            <div class="d-flex align-items-center flex-wrap gap-2">
+                                                <strong>@session.DeviceName</strong>
+                                                @if (session.IsCurrent)
+                                                {
+                                                    <span class="badge text-bg-primary">Это устройство</span>
+                                                }
+                                            </div>
+                                            <div class="small text-muted mt-1">
+                                                Вход: @session.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                            </div>
+                                            <div class="small text-muted">
+                                                Последняя активность: @session.LastSeenAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(session.IpAddress))
+                                            {
+                                                <div class="small text-muted">IP: @session.IpAddress</div>
+                                            }
+                                        </div>
+                                        <div class="d-flex align-items-start">
+                                            <button type="button"
+                                                    class="btn btn-outline-danger btn-sm"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#@modalId">
+                                                Завершить
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="modal fade" id="@modalId" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow">
+                                            <div class="modal-header border-0 pb-0">
+                                                <h3 class="modal-title h5">Завершить подключение?</h3>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="mb-2">Аккаунт будет закрыт на устройстве <strong>@session.DeviceName</strong>.</p>
+                                                @if (session.IsCurrent)
+                                                {
+                                                    <p class="text-muted small mb-0">Это текущее устройство. После завершения нужно будет войти заново.</p>
+                                                }
+                                            </div>
+                                            <div class="modal-footer border-0 pt-0">
+                                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Нет</button>
+                                                <form asp-action="RevokeSession" method="post">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@session.Id" />
+                                                    <button type="submit" class="btn btn-danger">Да, завершить</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+        </div>
+    </div>
+
+    @if (profile.IsRealtor)
+    {
+        <section class="card border-0 shadow-sm mt-3">
+            <div class="card-body p-4">
+                <h2 class="h5 mb-3">Мои жалобы</h2>
+
+                @if (Model.RealtorComplaints.Count == 0)
+                {
+                    <div class="alert alert-light border mb-0">По вашему профилю жалоб пока нет.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Категория</th>
+                                <th>Тема</th>
+                                <th>Статус</th>
+                                <th>Вердикт</th>
+                                <th>Связь</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var item in Model.RealtorComplaints)
+                            {
+                                <tr>
+                                    <td class="text-nowrap">@item.CreatedDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                                    <td>@DashboardValueDisplay.ComplaintCategory(item.Category)</td>
+                                    <td style="min-width: 240px;">
+                                        <div class="fw-semibold">@item.Subject</div>
+                                        <div class="small text-muted text-break">@item.Description</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.AdminResolution))
+                                        {
+                                            <div class="small mt-2"><span class="text-muted">Решение:</span> @item.AdminResolution</div>
+                                        }
+                                    </td>
+                                    <td>@DashboardValueDisplay.ComplaintStatus(item.Status)</td>
+                                    <td>@DashboardValueDisplay.ComplaintVerdict(item.ModerationVerdict)</td>
+                                    <td>
+                                        <div class="d-flex flex-column gap-1">
+                                            @if (item.DealId.HasValue)
+                                            {
+                                                <a asp-controller="DealRequests" asp-action="Details" asp-route-id="@item.DealId.Value">Сделка</a>
+                                            }
+                                            @if (item.PropertyId.HasValue)
+                                            {
+                                                <a asp-controller="Properties" asp-action="Details" asp-route-id="@item.PropertyId.Value">Объект</a>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+}
+
+<div class="modal fade" id="emailChangeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h3 class="modal-title h5 mb-1">Подтверждение нового email</h3>
+                    <div class="text-muted small">Введите код, который пришёл на новый адрес.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <form asp-action="ConfirmEmailChange" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <input type="hidden" asp-for="EmailChangeForm.NewEmail" />
+                    <div class="mb-3">
+                        <label class="form-label">Новый email</label>
+                        <div class="form-control bg-light">@Model.EmailChangeForm.NewEmail</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Код подтверждения</label>
+                        <input asp-for="EmailChangeForm.Code"
+                               class="form-control"
+                               inputmode="numeric"
+                               autocomplete="one-time-code"
+                               maxlength="6"
+                               pattern="\d{6}"
+                               placeholder="000000"
+                               required />
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Позже</button>
+                    <button type="submit" class="btn btn-primary">Подтвердить email</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (Model.ShowEmailChangeConfirmation)
+{
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const modalElement = document.getElementById('emailChangeModal');
+            if (modalElement && window.bootstrap) {
+                window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+            }
+        });
+    </script>
+}

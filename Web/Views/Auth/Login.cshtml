@@ -1,0 +1,92 @@
+﻿@model Web.Models.Auth.LoginRequest
+@{
+    ViewData["Title"] = "Вход";
+    var registrationHint = ViewData["RegistrationHint"] is bool hint && hint;
+    var authSuccess = ViewData["AuthSuccess"]?.ToString();
+    var confirmationEmail = ViewData["ConfirmationEmail"]?.ToString();
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm border-0 rounded-3">
+            <div class="card-body p-4 p-md-5">
+                <h2 class="text-center mb-4 font-weight-bold text-primary">Вход в систему</h2>
+
+                @if (ViewData["ApiError"] is Web.Models.Api.ApiErrorViewModel apiError)
+                {
+                    <partial name="_ApiErrorAlert" model="apiError" />
+                }
+
+                @if (registrationHint)
+                {
+                    <div class="alert alert-info">
+                        Для доступа к подбору нужен аккаунт. Если у вас еще нет доступа, оставьте заявку на регистрацию.
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(authSuccess))
+                {
+                    <div class="alert alert-success">
+                        @authSuccess
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(confirmationEmail))
+                {
+                    <div class="alert alert-light border">
+                        <div class="mb-2">Для входа нужно подтвердить email кодом из письма.</div>
+                        <a asp-action="ConfirmEmail" asp-route-email="@confirmationEmail" class="btn btn-sm btn-outline-primary">
+                            Ввести код
+                        </a>
+                    </div>
+                }
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                }
+
+                <form asp-action="Login"
+                      asp-route-returnUrl="@ViewData["ReturnUrl"]"
+                      asp-route-registrationHint="@registrationHint"
+                      method="post">
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label text-muted">Email адрес</label>
+                        <input asp-for="Email" class="form-control form-control-lg" placeholder="name@example.com" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="Password" class="form-label text-muted">Пароль</label>
+                        <div class="input-group password-input-group">
+                            <input asp-for="Password" type="password" class="form-control form-control-lg" placeholder="********" autocomplete="current-password" />
+                            <button class="btn btn-outline-secondary password-toggle" type="button" aria-label="Показать пароль" title="Показать пароль">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <span asp-validation-for="Password" class="text-danger"></span>
+                    </div>
+
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold">Войти</button>
+                    </div>
+
+                    <div class="text-center mb-3">
+                        <a asp-action="ForgotPassword" class="text-decoration-none">Забыли пароль?</a>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <p class="text-muted mb-0">
+                            Нет аккаунта?
+                            <a asp-action="Register" class="text-primary text-decoration-none fw-bold">Зарегистрироваться</a>
+                        </p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

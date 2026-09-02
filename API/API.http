@@ -1,0 +1,266 @@
+﻿@API_HostAddress = http://localhost:5142
+@adminEmail = SET_ADMIN_EMAIL
+@adminPassword = SET_ADMIN_PASSWORD
+@realtorEmail = SET_REALTOR_EMAIL
+@realtorPassword = SET_REALTOR_PASSWORD
+@clientEmail = SET_CLIENT_EMAIL
+@clientPassword = SET_CLIENT_PASSWORD
+
+# Paste accessToken values from login responses.
+@adminToken = PUT_ADMIN_TOKEN_HERE
+@realtorToken = PUT_REALTOR_TOKEN_HERE
+@clientToken = PUT_CLIENT_TOKEN_HERE
+
+# For end-to-end scenario paste ids from create responses.
+@sampleClientId = PUT_SAMPLE_CLIENT_ID_HERE
+@sampleRequirementId = PUT_SAMPLE_REQUIREMENT_ID_HERE
+@samplePropertyId = PUT_SAMPLE_PROPERTY_ID_HERE
+@newUserEmail = SET_NEW_USER_EMAIL
+@newUserPassword = SET_NEW_USER_PASSWORD
+@confirmUserId = PUT_CONFIRM_USER_ID_HERE
+@confirmToken = PUT_CONFIRM_TOKEN_HERE
+@resetToken = PUT_RESET_TOKEN_HERE
+
+### Health DB (anonymous, 200/503)
+GET {{API_HostAddress}}/api/health/db
+Accept: application/json
+
+### Health auto-matching worker (anonymous, 200/503)
+GET {{API_HostAddress}}/api/health/auto-matching
+Accept: application/json
+
+### Login: Admin (expected 200)
+POST {{API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### Login: Realtor (expected 200)
+POST {{API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{realtorEmail}}",
+  "password": "{{realtorPassword}}"
+}
+
+### Login: Client (expected 200)
+POST {{API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{clientEmail}}",
+  "password": "{{clientPassword}}"
+}
+
+### Login: invalid credentials (expected 401)
+POST {{API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{clientEmail}}",
+  "password": "WrongPassword!"
+}
+
+### Register new client (expected 200; EmailConfirmed=false + confirmation email)
+POST {{API_HostAddress}}/api/auth/register/client
+Content-Type: application/json
+
+{
+  "firstName": "New",
+  "lastName": "Client",
+  "middleName": null,
+  "email": "{{newUserEmail}}",
+  "phoneNumber": "+37369990099",
+  "password": "{{newUserPassword}}",
+  "confirmPassword": "{{newUserPassword}}"
+}
+
+### Login before email confirmation (expected 401 with confirmation hint)
+POST {{API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{newUserEmail}}",
+  "password": "{{newUserPassword}}"
+}
+
+### Resend email confirmation (always 200; no disclosure)
+POST {{API_HostAddress}}/api/auth/resend-confirmation
+Content-Type: application/json
+
+{
+  "email": "{{newUserEmail}}"
+}
+
+### Confirm email (expected 200; use userId+token from email link)
+POST {{API_HostAddress}}/api/auth/confirm-email
+Content-Type: application/json
+
+{
+  "userId": "{{confirmUserId}}",
+  "email": "{{newUserEmail}}",
+  "token": "{{confirmToken}}"
+}
+
+### Forgot password (always 200; no disclosure)
+POST {{API_HostAddress}}/api/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "{{newUserEmail}}"
+}
+
+### Reset password (expected 200; use token from email link)
+POST {{API_HostAddress}}/api/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "{{newUserEmail}}",
+  "token": "{{resetToken}}",
+  "newPassword": "{{newUserPassword}}",
+  "confirmPassword": "{{newUserPassword}}"
+}
+
+### 401 check: protected endpoint without token
+GET {{API_HostAddress}}/api/properties
+Accept: application/json
+
+### 403 check: Client token on AdminOnly endpoint
+GET {{API_HostAddress}}/api/clients?limit=5
+Authorization: Bearer {{clientToken}}
+Accept: application/json
+
+### 200 check: Admin token on AdminOnly endpoint
+GET {{API_HostAddress}}/api/clients?limit=5
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+### 200 check: Client token on allowed endpoint
+GET {{API_HostAddress}}/api/properties/available
+Authorization: Bearer {{clientToken}}
+Accept: application/json
+
+### 403 check: Client token on Realtor/Admin endpoint
+POST {{API_HostAddress}}/api/properties
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{
+  "title": "Forbidden client property creation",
+  "address": "Strada Test 1",
+  "price": 75000,
+  "area": 55,
+  "roomsCount": 2,
+  "latitude": 47.0105,
+  "longitude": 28.8638,
+  "type": "Apartment"
+}
+
+### 400 check: invalid matching payload (limit out of range)
+POST {{API_HostAddress}}/api/property-matching/matches
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{
+  "requirementId": "00000000-0000-0000-0000-000000000001",
+  "limit": 0
+}
+
+### 404 check: not found property
+GET {{API_HostAddress}}/api/properties/00000000-0000-0000-0000-000000000001
+Authorization: Bearer {{clientToken}}
+Accept: application/json
+
+### 409 check: duplicate client phone
+POST {{API_HostAddress}}/api/clients
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Peter",
+  "lastName": "DuplicatePhone",
+  "middleName": null,
+  "phoneNumber": "+37360000000",
+  "email": "duplicate-phone-test@realestate.local"
+}
+
+### ---- End-to-end scenario: requirement -> matching -> notification ----
+
+### 1) Create sample client (Admin, expected 201)
+POST {{API_HostAddress}}/api/clients
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Sample",
+  "lastName": "Client",
+  "middleName": null,
+  "phoneNumber": "+37369990001",
+  "email": "sample.client@realestate.local"
+}
+
+### 2) Create active requirement (Client/Realtor/Admin, expected 201)
+# Paste client id from step 1 into sampleClientId.
+# If Email.Enabled=true, create/update of active requirement sends top-N email.
+POST {{API_HostAddress}}/api/client-requirements
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{
+  "clientId": "{{sampleClientId}}",
+  "desiredType": "Apartment",
+  "latitude": 47.0105,
+  "longitude": 28.8638,
+  "searchRadiusMeters": 5000,
+  "minPrice": 90000,
+  "maxPrice": 180000,
+  "minArea": 45,
+  "minMatchPercentage": 0.55,
+  "priceWeight": 0.6,
+  "areaWeight": 0.4,
+  "criteria": [
+    {
+      "criterionDefinitionId": "00000000-0000-0000-0000-000000000010",
+      "priority": "Important",
+      "value": "brick",
+      "values": null
+    }
+  ]
+}
+
+### 3) Create property (Realtor/Admin, expected 201)
+# Paste created property id into samplePropertyId.
+# Creating relevant property triggers subscribed clients notification.
+POST {{API_HostAddress}}/api/properties
+Authorization: Bearer {{realtorToken}}
+Content-Type: application/json
+
+{
+  "title": "Sample apartment for matching",
+  "address": "Chisinau, Pushkin str. 10",
+  "price": 125000,
+  "area": 58,
+  "roomsCount": 2,
+  "latitude": 47.0110,
+  "longitude": 28.8640,
+  "type": "Apartment"
+}
+
+### 4) Run matching v2 by requirement (expected 200)
+POST {{API_HostAddress}}/api/property-matching/matches
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{
+  "requirementId": "{{sampleRequirementId}}",
+  "limit": 10
+}
+
+### 5) Check subscribed clients for created property (Realtor/Admin, expected 200)
+GET {{API_HostAddress}}/api/property-matching/properties/{{samplePropertyId}}/subscribed-clients?requirementsLimit=500
+Authorization: Bearer {{realtorToken}}
+Accept: application/json

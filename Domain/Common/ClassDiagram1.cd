@@ -1,0 +1,109 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="Domain.Common.BaseEntity" Collapsed="true">
+    <Position X="2.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAACAAAAAAAAAAAAgAAAAAAAAAAAAIAAAgAAAAAAAAA=</HashCode>
+      <FileName>Common\BaseEntity.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Common.BaseValueObject" Collapsed="true">
+    <Position X="9" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAgAAAAAAAAAAAAIAAAAAAAAAAAAA=</HashCode>
+      <FileName>Common\BaseValueObject.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Common.DomainException" Collapsed="true">
+    <Position X="0.5" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Common\DomainException.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Entities.ChatMessage" Collapsed="true">
+    <Position X="2.5" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAgCAAAAAAAAgEAAAAAABAAAAAAAABAAAAAA=</HashCode>
+      <FileName>Entities\ChatMessage.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Entities.Client" Collapsed="true">
+    <Position X="4.5" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAQAAAAAACCAAIAAAAAAQAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Entities\Client.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Entities.ClientRequirement" Collapsed="true">
+    <Position X="6.5" Y="2" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>BAQAAAAIAADAAAAA0AAAACAAAAAIAwAAAAAABAQAAAA=</HashCode>
+      <FileName>Entities\ClientRequirement.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Entities.Complaint" Collapsed="true">
+    <Position X="4.5" Y="4" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAEAACgAAAAgIAgAACAAAAAAgAAAAAAQAAAAAA=</HashCode>
+      <FileName>Entities\Complaint.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Entities.Deal" Collapsed="true">
+    <Position X="3.5" Y="3" Width="1.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAEQADAAAIAgAAAAAgAAAAAEAABBAQAAAAAAAA=</HashCode>
+      <FileName>Entities\Deal.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Entities.Property" Collapsed="true">
+    <Position X="0.5" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAEAQCAEEAAAgIABACAACAIAAACAQQBQQAAAAA=</HashCode>
+      <FileName>Entities\Property.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Entities.Realtor" Collapsed="true">
+    <Position X="1.5" Y="3" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAABAAAACAAIAAAAAAwAAAAAAAIAABACAAAACAAAA=</HashCode>
+      <FileName>Entities\Realtor.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Entities.RealtorActivityLog" Collapsed="true">
+    <Position X="5.5" Y="3" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAADAgAAAAAAAAAAAAAAAAAAAAQAAAAAAAAA=</HashCode>
+      <FileName>Entities\RealtorActivityLog.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.Entities.Review" Collapsed="true">
+    <Position X="2.75" Y="4" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAEAADAAAgAgAAABAAAAAAAAAEAAAAAAAAAAAA=</HashCode>
+      <FileName>Entities\Review.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.ValueObjects.FullName" Collapsed="true">
+    <Position X="9" Y="1.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAEAAAACAAAAEAAAQAAAAAAAAAAAAAAAAAAAAAAg=</HashCode>
+      <FileName>ValueObjects\FullName.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.ValueObjects.Money" Collapsed="true">
+    <Position X="8" Y="3" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAICAAAAAAAAAAAEAAACAACACQAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>ValueObjects\Money.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Domain.ValueObjects.Rating" Collapsed="true">
+    <Position X="10.25" Y="3" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgAAAAAAA=</HashCode>
+      <FileName>ValueObjects\Rating.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

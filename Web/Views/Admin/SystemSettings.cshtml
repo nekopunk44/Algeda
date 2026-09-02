@@ -1,0 +1,258 @@
+@model Web.Models.RealtorEfficiency.AdminSystemSettingsViewModel
+@using System.Globalization
+@using Web.Models.Dashboard
+@{
+    ViewData["Title"] = "Настройки системы";
+    var activeMenu = (string?)ViewData["AdminActive"] ?? string.Empty;
+    string DecimalValue(decimal value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    string NullableDecimalValue(decimal? value) => value.HasValue ? DecimalValue(value.Value) : string.Empty;
+    string DoubleValue(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+}
+
+<div class="row g-3">
+    <div class="col-xl-3 col-lg-4">
+        <partial name="_Sidebar" model="activeMenu" />
+    </div>
+    <div class="col-xl-9 col-lg-8">
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <h1 class="h4 mb-1">Настройки системы</h1>
+                <div class="text-muted">Ограничения дорогих заявок, комиссии и правила уровней риелторов.</div>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">@Model.SuccessMessage</div>
+        }
+
+        @if (Model.ApiError is not null)
+        {
+            <partial name="_ApiErrorAlert" model="Model.ApiError" />
+        }
+
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <h2 class="h6 text-uppercase text-muted mb-1">Настройки ограничений дорогих заявок</h2>
+                <div class="small text-muted mb-3">
+                    Все уровни могут брать заявки от 0. Для Junior и Standard задается максимальная цена, Top может брать любую заявку.
+                </div>
+
+                <form asp-action="UpdateEligibilitySettings" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <div class="col-12 form-check form-switch">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               role="switch"
+                               id="restrictionsEnabled"
+                               name="restrictionsEnabled"
+                               value="true"
+                               @(Model.EligibilitySettings.RestrictionsEnabled ? "checked" : null) />
+                        <label class="form-check-label" for="restrictionsEnabled">Включить ограничения по уровню риелтора</label>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Уровень</th>
+                                        <th style="width: 160px;">Цена от (USD)</th>
+                                        <th style="width: 260px;">Максимальная цена заявки (USD)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var tier in Model.EligibilitySettings.PriceTiers.OrderBy(x => x.SortOrder))
+                                    {
+                                        <tr>
+                                            <td>
+                                                <input type="hidden" name="tierNames" value="@tier.Name" />
+                                                <input type="hidden" name="tierMinPrices" value="0" />
+                                                <span class="badge bg-primary-subtle text-primary-emphasis border">@DashboardValueDisplay.RealtorLevel(tier.Name)</span>
+                                            </td>
+                                            <td>
+                                                <span class="text-muted">0</span>
+                                            </td>
+                                            <td>
+                                                @if (string.Equals(tier.Name, "Top", StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <input type="hidden" name="tierMaxPrices" value="" />
+                                                    <span class="text-muted">Без ограничения</span>
+                                                }
+                                                else
+                                                {
+                                                    <input type="number"
+                                                           step="0.01"
+                                                           min="0.01"
+                                                           class="form-control form-control-sm"
+                                                           name="tierMaxPrices"
+                                                           value="@NullableDecimalValue(tier.MaxPrice)"
+                                                           required />
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-outline-primary">Сохранить ограничения</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <h2 class="h6 text-uppercase text-muted mb-1">Комиссии риелторов</h2>
+                <div class="small text-muted mb-3">
+                    Процент применяется к общей комиссии сделки и фиксируется при закрытии.
+                </div>
+
+                <form asp-action="UpdateRealtorCommissions" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <div class="col-12">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Уровень</th>
+                                        <th style="width: 260px;">Процент риелтора</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.CommissionSettings.Items)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <input type="hidden" name="levels" value="@item.Level" />
+                                                <strong>@DashboardValueDisplay.RealtorLevel(item.Level)</strong>
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number"
+                                                           name="percents"
+                                                           min="0"
+                                                           max="100"
+                                                           step="0.01"
+                                                           class="form-control"
+                                                           value="@DecimalValue(item.Percent)"
+                                                           required />
+                                                    <span class="input-group-text">%</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-outline-primary">Сохранить комиссии</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h2 class="h6 text-uppercase text-muted mb-1">Правила уровней риелторов</h2>
+                <div class="small text-muted mb-3">
+                    Уровень рассчитывается по завершенным сделкам и последним CTS/APS. Junior является базовым уровнем.
+                </div>
+
+                <form asp-action="UpdateRealtorLevelSettings" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="demotionBuffer" value="@DoubleValue(Model.LevelSettings.DemotionBuffer)" />
+
+                    <div class="col-12">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Уровень</th>
+                                        <th style="width: 220px;">Мин. завершенных сделок</th>
+                                        <th style="width: 180px;">Мин. CTS</th>
+                                        <th style="width: 180px;">Мин. APS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var rule in Model.LevelSettings.Rules.OrderBy(x => x.SortOrder))
+                                    {
+                                        var isJunior = string.Equals(rule.Level, "Junior", StringComparison.OrdinalIgnoreCase);
+                                        <tr>
+                                            <td>
+                                                <input type="hidden" name="levels" value="@rule.Level" />
+                                                <span class="badge bg-primary-subtle text-primary-emphasis border">@DashboardValueDisplay.RealtorLevel(rule.Level)</span>
+                                            </td>
+                                            <td>
+                                                @if (isJunior)
+                                                {
+                                                    <input type="hidden" name="minCompletedDeals" value="0" />
+                                                    <span class="text-muted">Базовый уровень</span>
+                                                }
+                                                else
+                                                {
+                                                    <input type="number"
+                                                           class="form-control form-control-sm"
+                                                           name="minCompletedDeals"
+                                                           min="0"
+                                                           step="1"
+                                                           value="@rule.MinCompletedDeals"
+                                                           required />
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (isJunior)
+                                                {
+                                                    <input type="hidden" name="minClientTrustScores" value="0" />
+                                                    <span class="text-muted">-</span>
+                                                }
+                                                else
+                                                {
+                                                    <input type="number"
+                                                           class="form-control form-control-sm"
+                                                           name="minClientTrustScores"
+                                                           min="0"
+                                                           max="5"
+                                                           step="0.01"
+                                                           value="@DoubleValue(rule.MinClientTrustScore)"
+                                                           required />
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (isJunior)
+                                                {
+                                                    <input type="hidden" name="minAdminPerformanceScores" value="0" />
+                                                    <span class="text-muted">-</span>
+                                                }
+                                                else
+                                                {
+                                                    <input type="number"
+                                                           class="form-control form-control-sm"
+                                                           name="minAdminPerformanceScores"
+                                                           min="0"
+                                                           max="5"
+                                                           step="0.01"
+                                                           value="@DoubleValue(rule.MinAdminPerformanceScore)"
+                                                           required />
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-outline-primary">Сохранить правила уровней</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+</div>
