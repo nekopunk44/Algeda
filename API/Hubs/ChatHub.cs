@@ -18,26 +18,6 @@ namespace API.Hubs
             _dealChatService = dealChatService;
         }
 
-        public async Task SendToUser(string receiverUserId, string message)
-        {
-            await Clients.User(receiverUserId).SendAsync("ReceiveMessage", message);
-        }
-
-        public async Task SendToDialog(string dialogId, string message)
-        {
-            await Clients.Group(dialogId).SendAsync("ReceiveDialogMessage", message);
-        }
-
-        public async Task JoinDialog(string dialogId)
-        {
-            await Groups.AddToGroupAsync(Context.ConnectionId, dialogId);
-        }
-
-        public async Task LeaveDialog(string dialogId)
-        {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, dialogId);
-        }
-
         public async Task JoinDealChat(Guid dealId)
         {
             var canAccess = await _dealChatService.CanAccessDealChat(

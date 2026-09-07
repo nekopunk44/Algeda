@@ -29,7 +29,8 @@ namespace API.Auth
                 new(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new(AuthSessionClaimNames.SessionId, sessionId.ToString())
+                new(AuthSessionClaimNames.SessionId, sessionId.ToString()),
+                new(AuthSessionClaimNames.SecurityStamp, user.SecurityStamp ?? string.Empty)
             };
 
             foreach (var role in roles)
