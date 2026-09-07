@@ -18,7 +18,7 @@ public class PropertiesApiClient
     {
         try
         {
-            var response = await _httpClient.GetAsync("api/properties/available", cancellationToken);
+            var response = await _httpClient.GetAsync("api/properties/available?limit=500", cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return ApiClientResult<IReadOnlyList<PropertySummaryViewModel>>.Failure(

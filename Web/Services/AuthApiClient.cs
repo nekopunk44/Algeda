@@ -132,6 +132,16 @@ namespace Web.Services
             return SendAuthFlowAsync("api/auth/reset-password", request, cancellationToken);
         }
 
+        public Task<ApiOperationResult> LogoutAsync(CancellationToken cancellationToken = default)
+        {
+            return ApiClientSupport.SendAsync(
+                _httpClient,
+                HttpMethod.Post,
+                "api/auth/logout",
+                payload: null,
+                cancellationToken);
+        }
+
         private async Task<AuthFlowApiResult> SendAuthFlowAsync(
             string url,
             object payload,
@@ -198,37 +208,10 @@ namespace Web.Services
 
         private static string? GetClientIpAddress(HttpContext httpContext)
         {
-            var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].ToString();
-            if (!string.IsNullOrWhiteSpace(forwardedFor))
-            {
-                return forwardedFor
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .FirstOrDefault(IsPublicAddressCandidate);
-            }
-
-            var realIp = httpContext.Request.Headers["X-Real-IP"].ToString();
-            if (IsPublicAddressCandidate(realIp))
-            {
-                return realIp;
-            }
-
             var remoteIp = httpContext.Connection.RemoteIpAddress;
             return remoteIp is null || IPAddress.IsLoopback(remoteIp)
                 ? null
                 : remoteIp.ToString();
-        }
-
-        private static bool IsPublicAddressCandidate(string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return false;
-            }
-
-            return IPAddress.TryParse(value, out var address)
-                ? !IPAddress.IsLoopback(address)
-                : !string.Equals(value, "::1", StringComparison.Ordinal)
-                    && !string.Equals(value, "127.0.0.1", StringComparison.Ordinal);
         }
 
         private static string BuildWebDeviceCode(string? userAgent)
