@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using Application.DTOs.PropertyPhotos;
 using Application.Exceptions;
 using Application.Interfaces;
@@ -217,6 +217,13 @@ public sealed class PropertyPhotoStorageService : IPropertyPhotoStorageService
         CancellationToken cancellationToken)
     {
         await using var sourceStream = new MemoryStream(content);
+        var imageInfo = await Image.IdentifyAsync(sourceStream, cancellationToken);
+        if ((long)imageInfo.Width * imageInfo.Height > _options.MaxSourcePixels)
+        {
+            throw new ValidationException("Разрешение изображения превышает допустимый предел.");
+        }
+
+        sourceStream.Position = 0;
         using var image = await Image.LoadAsync(sourceStream, cancellationToken);
 
         if (image.Width < 64 || image.Height < 64)

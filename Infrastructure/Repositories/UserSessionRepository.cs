@@ -65,6 +65,25 @@ public sealed class UserSessionRepository : IUserSessionRepository
                 cancellationToken);
     }
 
+    public async Task RevokeAll(
+        Guid userId,
+        DateTime revokedAtUtc,
+        Guid? exceptSessionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.UserSessions
+            .Where(x => x.UserId == userId && x.RevokedAtUtc == null);
+
+        if (exceptSessionId.HasValue)
+        {
+            query = query.Where(x => x.Id != exceptSessionId.Value);
+        }
+
+        await query.ExecuteUpdateAsync(
+            setters => setters.SetProperty(x => x.RevokedAtUtc, revokedAtUtc),
+            cancellationToken);
+    }
+
     public Task SaveChanges(CancellationToken cancellationToken = default)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);

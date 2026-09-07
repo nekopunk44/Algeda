@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;

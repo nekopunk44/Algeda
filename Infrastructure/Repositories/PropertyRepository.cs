@@ -31,11 +31,14 @@ namespace Infrastructure.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<Property>> GetAvailable()
+        public async Task<List<Property>> GetAvailable(int limit, int offset)
         {
             return await QueryWithCriteria(_context.Properties.AsNoTracking())
                 .Where(x => x.Status == PropertyStatus.Available)
                 .OrderByDescending(x => x.CreatedDate)
+                .ThenByDescending(x => x.Id)
+                .Skip(offset)
+                .Take(limit)
                 .ToListAsync();
         }
 

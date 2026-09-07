@@ -1,4 +1,4 @@
-﻿using Application.Interfaces;
+using Application.Interfaces;
 using Domain.Entities;
 using Domain.ValueObjects;
 using Microsoft.AspNetCore.Identity;
@@ -36,13 +36,30 @@ namespace Infrastructure.Identity
         {
             var options = _options.Value;
 
+            await EnsureRolesAsync(cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(options.BootstrapSuperAdminEmail))
+            {
+                await EnsureExistingBootstrapSuperAdmin(
+                    options.BootstrapSuperAdminEmail,
+                    cancellationToken);
+            }
+
             if (!options.Enabled)
             {
-                _logger.LogInformation("Сидирование Identity отключено.");
+                _logger.LogInformation("Сидирование демонстрационных пользователей Identity отключено.");
                 return;
             }
+
+            await SeedDemoUsersAsync(options, cancellationToken);
+        }
+
+        public async Task EnsureRolesAsync(CancellationToken cancellationToken = default)
+        {
             foreach (var role in AppRoles.All)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 if (await _roleManager.RoleExistsAsync(role))
                 {
                     continue;
@@ -55,14 +72,28 @@ namespace Infrastructure.Identity
                         $"Не удалось создать роль '{role}': {string.Join("; ", createRole.Errors.Select(e => e.Description))}");
                 }
             }
+        }
 
+        public async Task BootstrapSuperAdminAsync(
+            SeedUserOptions userOptions,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(userOptions);
+
+            await EnsureRolesAsync(cancellationToken);
+            var user = await EnsureUserAsync(userOptions, AppRoles.Admin, cancellationToken);
+            await EnsureRoleAsync(user, AppRoles.SuperAdmin);
+
+            _logger.LogInformation(
+                "Учетная запись главного администратора {Email} подготовлена.",
+                user.Email);
+        }
+
+        private async Task SeedDemoUsersAsync(
+            IdentitySeedOptions options,
+            CancellationToken cancellationToken)
+        {
             await EnsureUserAsync(options.Admin, AppRoles.Admin, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(options.BootstrapSuperAdminEmail))
-            {
-                await EnsureExistingBootstrapSuperAdmin(
-                    options.BootstrapSuperAdminEmail,
-                    cancellationToken);
-            }
             var seededRealtorUser = await EnsureUserAsync(options.Realtor, AppRoles.Realtor, cancellationToken);
             await EnsureRealtorProfileAsync(seededRealtorUser, options.Realtor);
             var seededClientUser = await EnsureUserAsync(options.Client, AppRoles.Client, cancellationToken);

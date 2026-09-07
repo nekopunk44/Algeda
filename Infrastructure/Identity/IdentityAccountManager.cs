@@ -1,4 +1,4 @@
-﻿using Application.Interfaces;
+using Application.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
@@ -142,6 +142,7 @@ namespace Infrastructure.Identity
                 return IdentityOperationResult.Success();
             }
 
+            user.SecurityStamp = Guid.NewGuid().ToString();
             var addRoleResult = await _userManager.AddToRoleAsync(user, role);
             if (!addRoleResult.Succeeded)
             {
@@ -384,6 +385,7 @@ namespace Infrastructure.Identity
                 return IdentityOperationResult.Success();
             }
 
+            user.SecurityStamp = Guid.NewGuid().ToString();
             var removeRoleResult = await _userManager.RemoveFromRoleAsync(user, role);
             if (!removeRoleResult.Succeeded)
             {
@@ -519,6 +521,7 @@ namespace Infrastructure.Identity
             user.IsFrozen = isFrozen;
             user.FrozenAtUtc = isFrozen ? DateTime.UtcNow : null;
             user.FrozenByUserId = isFrozen ? frozenByUserId : null;
+            user.SecurityStamp = Guid.NewGuid().ToString();
 
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded)

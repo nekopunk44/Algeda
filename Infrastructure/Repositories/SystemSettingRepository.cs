@@ -29,20 +29,15 @@ namespace Infrastructure.Repositories
 
         public void Upsert(string key, string value)
         {
-            var normalizedKey = key.Trim();
-            var setting = _context.SystemSettings
-                .FirstOrDefault(x => x.Key == normalizedKey);
+            var setting = new SystemSetting(key, value);
 
-            if (setting is null)
-            {
-                _context.SystemSettings.Add(new SystemSetting(normalizedKey, value));
-            }
-            else
-            {
-                setting.UpdateValue(value);
-            }
-
-            _context.SaveChanges();
+            _context.Database.ExecuteSqlInterpolated($"""
+                INSERT INTO "SystemSettings" ("Id", "Key", "Value", "UpdatedAtUtc", "CreatedDate")
+                VALUES ({setting.Id}, {setting.Key}, {setting.Value}, {setting.UpdatedAtUtc}, {setting.CreatedDate})
+                ON CONFLICT ("Key") DO UPDATE
+                SET "Value" = EXCLUDED."Value",
+                    "UpdatedAtUtc" = EXCLUDED."UpdatedAtUtc";
+                """);
         }
     }
 }

@@ -16,6 +16,50 @@ namespace Infrastructure.Repositories
             _context = context;
         }
 
+        public async Task<TResult> ExecuteWorkflow<TResult>(
+            Guid dealId,
+            Func<Task<TResult>> operation)
+        {
+            ArgumentNullException.ThrowIfNull(operation);
+
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
+            return await executionStrategy.ExecuteAsync(async () =>
+            {
+                // A retry must start from a clean tracker; otherwise stale entities from
+                // the failed attempt could be saved during the next attempt.
+                _context.ChangeTracker.Clear();
+
+                var propertyId = await _context.Deals
+                    .AsNoTracking()
+                    .Where(x => x.Id == dealId)
+                    .Select(x => (Guid?)x.PropertyId)
+                    .SingleOrDefaultAsync();
+
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    // Every workflow locks the shared property first and the deal second.
+                    // The stable order prevents two related deals from updating the same
+                    // property (or the linked sale request) concurrently.
+                    if (propertyId is Guid lockedPropertyId && lockedPropertyId != Guid.Empty)
+                    {
+                        await AcquireWorkflowLock($"property:{lockedPropertyId:D}");
+                    }
+
+                    await AcquireWorkflowLock($"deal:{dealId:D}");
+
+                    var result = await operation();
+                    await transaction.CommitAsync();
+                    return result;
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
+        }
+
         public override async Task<Deal?> GetById(Guid id)
         {
             return await QueryWithNotes(_context.Deals.AsNoTracking())
@@ -136,6 +180,12 @@ namespace Infrastructure.Repositories
         {
             return query
                 .Include(x => x.Notes);
+        }
+
+        private Task AcquireWorkflowLock(string resource)
+        {
+            return _context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({resource}, 0));");
         }
     }
 }

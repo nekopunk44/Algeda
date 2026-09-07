@@ -1,4 +1,4 @@
-﻿using Application.Interfaces;
+using Application.Interfaces;
 using Infrastructure.Email;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
@@ -25,7 +25,15 @@ namespace Infrastructure
             services.AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(
                     connectionString,
-                    o => o.UseNetTopologySuite()));
+                    o =>
+                    {
+                        o.UseNetTopologySuite();
+                        o.CommandTimeout(30);
+                        o.EnableRetryOnFailure(
+                            maxRetryCount: 5,
+                            maxRetryDelay: TimeSpan.FromSeconds(10),
+                            errorCodesToAdd: null);
+                    }));
 
             services
                 .AddIdentityCore<ApplicationUser>(options =>
