@@ -58,9 +58,7 @@ namespace API.Background
                     var propertyRepository = scope.ServiceProvider.GetRequiredService<IPropertyRepository>();
                     var notificationService = scope.ServiceProvider.GetRequiredService<PropertyMatchingNotificationService>();
 
-                    var availableProperties = (await propertyRepository.GetAvailable())
-                        .Take(options.BatchSize)
-                        .ToList();
+                    var availableProperties = await propertyRepository.GetAvailable(options.BatchSize, 0);
 
                     var changedProperties = _hasTrackedSnapshot
                         ? DetectChangedProperties(availableProperties, options.TrackedPropertiesTtlMinutes)
