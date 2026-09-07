@@ -1,4 +1,4 @@
-﻿using API.Auth;
+using API.Auth;
 using Application.DTOs.Profile;
 using Application.Services;
 using Infrastructure.Identity;
@@ -61,6 +61,9 @@ public sealed class ProfileController : ApiControllerBase
         return ExecuteAsync(async () =>
         {
             await _userProfileService.ChangePassword(GetUserEmailOrEmpty(), request);
+            await _userSessionService.RevokeAll(
+                GetUserId(),
+                cancellationToken: HttpContext.RequestAborted);
             return Ok(new { message = "Пароль успешно изменен." });
         });
     }
@@ -91,6 +94,10 @@ public sealed class ProfileController : ApiControllerBase
                 IsAdmin(),
                 request,
                 HttpContext.RequestAborted);
+
+            await _userSessionService.RevokeAll(
+                GetUserId(),
+                cancellationToken: HttpContext.RequestAborted);
 
             return Ok(profile);
         });

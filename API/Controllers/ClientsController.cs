@@ -19,6 +19,7 @@ namespace API.Controllers
             _service = service;
         }
 
+        [Authorize(Policy = AuthorizationPolicies.RealtorOrAdmin)]
         [HttpGet]
         public Task<IActionResult> Get([FromQuery][Range(1, 500)] int limit = 100)
         {

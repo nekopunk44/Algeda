@@ -1,4 +1,5 @@
 using API.Background;
+using API.Auth;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace API.Controllers
 {
-    [AllowAnonymous]
     [ApiController]
     [Route("api/health")]
     public class HealthController : ControllerBase
@@ -15,18 +15,22 @@ namespace API.Controllers
         private readonly AppDbContext _dbContext;
         private readonly AutoMatchingWorkerState _workerState;
         private readonly IOptionsMonitor<AutoMatchingWorkerOptions> _workerOptionsMonitor;
+        private readonly ILogger<HealthController> _logger;
 
         public HealthController(
             AppDbContext dbContext,
             AutoMatchingWorkerState workerState,
-            IOptionsMonitor<AutoMatchingWorkerOptions> workerOptionsMonitor)
+            IOptionsMonitor<AutoMatchingWorkerOptions> workerOptionsMonitor,
+            ILogger<HealthController> logger)
         {
             _dbContext = dbContext;
             _workerState = workerState;
             _workerOptionsMonitor = workerOptionsMonitor;
+            _logger = logger;
         }
 
         [HttpGet("db")]
+        [AllowAnonymous]
         public async Task<IActionResult> CheckDatabase(CancellationToken cancellationToken)
         {
             try
@@ -46,27 +50,37 @@ namespace API.Controllers
                 var pendingMigrations = await _dbContext.Database
                     .GetPendingMigrationsAsync(cancellationToken);
 
+                if (pendingMigrations.Any())
+                {
+                    return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+                    {
+                        status = "unavailable",
+                        database = "postgresql",
+                        timestampUtc = DateTime.UtcNow
+                    });
+                }
+
                 return Ok(new
                 {
                     status = "ok",
                     database = "postgresql",
-                    pendingMigrationsCount = pendingMigrations.Count(),
                     timestampUtc = DateTime.UtcNow
                 });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Database health check failed.");
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, new
                 {
                     status = "unavailable",
                     database = "postgresql",
-                    error = ex.Message,
                     timestampUtc = DateTime.UtcNow
                 });
             }
         }
 
         [HttpGet("auto-matching")]
+        [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
         public IActionResult CheckAutoMatchingWorker()
         {
             var snapshot = _workerState.GetSnapshot();

@@ -74,7 +74,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
                 "Конфликт",
                 exception.Message),
 
-            AppValidationException or FluentValidationException or DomainException or ArgumentException or InvalidOperationException or BadHttpRequestException => (
+            AppValidationException or FluentValidationException or DomainException or BadHttpRequestException => (
                 StatusCodes.Status400BadRequest,
                 "Ошибка валидации",
                 exception.Message),

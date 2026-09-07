@@ -1,4 +1,4 @@
-﻿using API.Auth;
+using API.Auth;
 using API.Hubs;
 using Application.DTOs.DealChat;
 using Application.Interfaces;

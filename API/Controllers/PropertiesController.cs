@@ -33,11 +33,13 @@ namespace API.Controllers
 
         [HttpGet("available")]
         [AllowAnonymous]
-        public Task<IActionResult> GetAvailable()
+        public Task<IActionResult> GetAvailable(
+            [FromQuery][Range(1, 500)] int limit = 200,
+            [FromQuery][Range(0, 100_000)] int offset = 0)
         {
             return ExecuteAsync(async () =>
             {
-                var properties = await _service.GetAvailable();
+                var properties = await _service.GetAvailable(limit, offset);
                 return Ok(properties.Select(property => property.WithoutPrivateOwnerData()));
             });
         }

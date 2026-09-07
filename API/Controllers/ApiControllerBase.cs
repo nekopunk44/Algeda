@@ -53,17 +53,14 @@ public abstract class ApiControllerBase : ControllerBase
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            Console.WriteLine($"[CRITICAL ERROR] DbUpdateConcurrencyException: {ex.Message}");
-            Console.WriteLine(ex.StackTrace);
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"InnerException: {ex.InnerException.Message}");
-                Console.WriteLine(ex.InnerException.StackTrace);
-            }
-            foreach (var entry in ex.Entries)
-            {
-                Console.WriteLine($"Entity: {entry.Entity.GetType().Name}, State: {entry.State}");
-            }
+            var logger = HttpContext.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger(GetType());
+            logger.LogError(
+                ex,
+                "Конфликт параллельного обновления для запроса {Path}: {Entries}",
+                HttpContext.Request.Path,
+                string.Join(", ", ex.Entries.Select(entry => $"{entry.Entity.GetType().Name}/{entry.State}")));
 
             return Conflict(new ProblemDetails
             {

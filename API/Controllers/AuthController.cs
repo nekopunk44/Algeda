@@ -1,4 +1,5 @@
 using API.Auth;
+using API.Configuration;
 using Application.Exceptions;
 using Application.Interfaces;
 using Application.Services;
@@ -6,6 +7,8 @@ using Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
 
 namespace API.Controllers
 {
@@ -43,6 +46,7 @@ namespace API.Controllers
 
         [AllowAnonymous]
         [HttpPost("login")]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         public Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             return ExecuteAsync(async () =>
@@ -148,8 +152,30 @@ namespace API.Controllers
             return Ok(new AccountStatusResponse(false));
         }
 
+        [Authorize]
+        [HttpPost("logout")]
+        public Task<IActionResult> Logout()
+        {
+            return ExecuteAsync(async () =>
+            {
+                var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var sessionIdValue = User.FindFirstValue(AuthSessionClaimNames.SessionId);
+                if (Guid.TryParse(userIdValue, out var userId)
+                    && Guid.TryParse(sessionIdValue, out var sessionId))
+                {
+                    await _userSessionService.Revoke(
+                        userId,
+                        sessionId,
+                        HttpContext.RequestAborted);
+                }
+
+                return NoContent();
+            });
+        }
+
         [AllowAnonymous]
         [HttpPost("register/client")]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         public Task<IActionResult> RegisterClient([FromBody] Application.DTOs.Auth.RegisterClientRequest request)
         {
             return ExecuteAsync(async () =>
@@ -158,6 +184,7 @@ namespace API.Controllers
 
         [AllowAnonymous]
         [HttpPost("register/realtor-request")]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         public Task<IActionResult> RegisterRealtorRequest([FromBody] Application.DTOs.Auth.RegisterRealtorRequest request)
         {
             return ExecuteAsync(async () =>
@@ -166,6 +193,7 @@ namespace API.Controllers
 
         [AllowAnonymous]
         [HttpPost("confirm-email")]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         public Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailRequest request)
         {
             return ExecuteAsync(async () =>
@@ -198,6 +226,7 @@ namespace API.Controllers
 
         [AllowAnonymous]
         [HttpPost("resend-confirmation")]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         public Task<IActionResult> ResendConfirmation([FromBody] ResendEmailConfirmationRequest request)
         {
             return ExecuteAsync(async () =>
@@ -214,6 +243,7 @@ namespace API.Controllers
 
         [AllowAnonymous]
         [HttpPost("forgot-password")]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         public Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
             return ExecuteAsync(async () =>
@@ -245,6 +275,7 @@ namespace API.Controllers
 
         [AllowAnonymous]
         [HttpPost("reset-password")]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         public Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
         {
             return ExecuteAsync(async () =>
@@ -254,8 +285,12 @@ namespace API.Controllers
                     throw new ValidationException("Пароль и подтверждение пароля не совпадают.");
                 }
 
+                var normalizedEmail = NormalizeEmail(request.Email);
+                var user = await _identityAccountManager.GetUserByEmail(
+                    normalizedEmail,
+                    HttpContext.RequestAborted);
                 var result = await _identityAccountManager.ResetPasswordByCode(
-                    NormalizeEmail(request.Email),
+                    normalizedEmail,
                     request.Code,
                     request.NewPassword,
                     HttpContext.RequestAborted);
@@ -265,6 +300,13 @@ namespace API.Controllers
                     throw new ValidationException(JoinIdentityErrors(
                         result.Errors,
                         "Код восстановления неверный или устарел. Запросите новый код."));
+                }
+
+                if (user is not null)
+                {
+                    await _userSessionService.RevokeAll(
+                        user.UserId,
+                        cancellationToken: HttpContext.RequestAborted);
                 }
 
                 return Ok(new AuthOperationResponse("Пароль успешно изменен."));
