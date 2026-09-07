@@ -108,7 +108,9 @@ public class RealtorLevelCalculationServiceTests
     [Fact]
     public void UpdateFromAdmin_ShouldRejectInvalidLevelRules()
     {
-        var service = new RealtorLevelSettingsService(OptionsFactory.Create(new RealtorEfficiencyOptions()));
+        var service = new RealtorLevelSettingsService(
+            OptionsFactory.Create(new RealtorEfficiencyOptions()),
+            new InMemorySystemSettingRepository());
 
         Assert.Throws<Application.Exceptions.ValidationException>(() => service.UpdateFromAdmin(
             new UpdateRealtorLevelSettingsRequest(
@@ -129,7 +131,9 @@ public class RealtorLevelCalculationServiceTests
         var realtorRepository = new RealtorRepositoryStub(realtor);
         var dealRepository = new DealRepositoryStub(realtor.Id, completedDealsCount);
         var snapshotRepository = new SnapshotRepositoryStub(snapshot);
-        var settingsService = new RealtorLevelSettingsService(OptionsFactory.Create(new RealtorEfficiencyOptions()));
+        var settingsService = new RealtorLevelSettingsService(
+            OptionsFactory.Create(new RealtorEfficiencyOptions()),
+            new InMemorySystemSettingRepository());
 
         return new RealtorLevelCalculationService(
             realtorRepository,
@@ -193,6 +197,7 @@ public class RealtorLevelCalculationServiceTests
             _completedDealsCount = completedDealsCount;
         }
 
+        public Task<TResult> ExecuteWorkflow<TResult>(Guid dealId, Func<Task<TResult>> operation) => operation();
         public Task<Deal?> GetById(Guid id) => Task.FromResult<Deal?>(null);
         public Task<List<Deal>> Get(int limit) => Task.FromResult(new List<Deal>());
         public Task<Deal> Add(Deal entity) => Task.FromResult(entity);

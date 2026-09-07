@@ -1,4 +1,4 @@
-﻿using Application.DTOs.Client;
+using Application.DTOs.Client;
 using Application.DTOs.ClientRequirement;
 using Application.DTOs.PropertyMatching;
 using Application.Validators;

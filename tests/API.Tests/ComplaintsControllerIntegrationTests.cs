@@ -329,6 +329,8 @@ public class ComplaintsControllerIntegrationTests :
             _store = store;
         }
 
+        public Task<TResult> ExecuteWorkflow<TResult>(Guid dealId, Func<Task<TResult>> operation) => operation();
+
         public Task<Deal?> GetById(Guid id)
         {
             _store.Deals.TryGetValue(id, out var deal);
@@ -396,7 +398,7 @@ public class ComplaintsControllerIntegrationTests :
             return _store.Properties.Remove(entity.Id);
         }
 
-        public Task<List<Property>> GetAvailable() => Task.FromResult(_store.Properties.Values.ToList());
+        public Task<List<Property>> GetAvailable(int limit, int offset) => Task.FromResult(_store.Properties.Values.Skip(offset).Take(limit).ToList());
         public Task<List<Property>> GetByResponsibleRealtor(Guid realtorId, DateTime fromUtc) => Task.FromResult(_store.Properties.Values.Where(x => x.ResponsibleRealtorId == realtorId).ToList());
         public Task<List<Property>> GetByIds(IReadOnlyCollection<Guid> ids) => Task.FromResult(_store.Properties.Values.Where(x => ids.Contains(x.Id)).ToList());
         public Task<Property?> GetByIdForUpdateWithCriteria(Guid id) => GetById(id);

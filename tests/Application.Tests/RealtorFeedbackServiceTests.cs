@@ -202,6 +202,8 @@ public class RealtorFeedbackServiceTests
 
         public void AddInMemory(Deal deal) => _storage.Add(deal);
 
+        public Task<TResult> ExecuteWorkflow<TResult>(Guid dealId, Func<Task<TResult>> operation) => operation();
+
         public Task<Deal?> GetById(Guid id) => Task.FromResult(_storage.FirstOrDefault(x => x.Id == id));
 
         public Task<List<Deal>> Get(int limit) => Task.FromResult(_storage.Take(limit).ToList());
@@ -253,7 +255,7 @@ public class RealtorFeedbackServiceTests
 
         public bool Delete(Property entity) => _storage.Remove(entity);
 
-        public Task<List<Property>> GetAvailable() => Task.FromResult(new List<Property>());
+        public Task<List<Property>> GetAvailable(int limit, int offset) => Task.FromResult(new List<Property>());
         public Task<List<Property>> GetByResponsibleRealtor(Guid realtorId, DateTime fromUtc) => Task.FromResult(new List<Property>());
         public Task<List<Property>> GetByIds(IReadOnlyCollection<Guid> ids) => Task.FromResult(_storage.Where(x => ids.Contains(x.Id)).ToList());
         public Task<Property?> GetByIdForUpdateWithCriteria(Guid id) => GetById(id);

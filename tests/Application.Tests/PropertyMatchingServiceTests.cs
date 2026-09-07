@@ -1,4 +1,4 @@
-﻿using Application.DTOs.PropertyMatching;
+using Application.DTOs.PropertyMatching;
 using Application.Interfaces;
 using Application.Services;
 using Domain.Entities;
@@ -272,10 +272,12 @@ public class PropertyMatchingServiceTests
             return _properties.Remove(entity);
         }
 
-        public Task<List<Property>> GetAvailable()
+        public Task<List<Property>> GetAvailable(int limit, int offset)
         {
             var available = _properties
                 .Where(x => x.Status == PropertyStatus.Available)
+                .Skip(offset)
+                .Take(limit)
                 .ToList();
 
             return Task.FromResult(available);

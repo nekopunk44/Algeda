@@ -133,6 +133,8 @@ public class DealDocumentServiceTests
             _deals = deals.ToList();
         }
 
+        public Task<TResult> ExecuteWorkflow<TResult>(Guid dealId, Func<Task<TResult>> operation) => operation();
+
         public Task<Deal?> GetById(Guid id)
         {
             return Task.FromResult(_deals.FirstOrDefault(x => x.Id == id));

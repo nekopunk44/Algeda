@@ -392,10 +392,12 @@ public class PropertyMatchingNotificationServiceTests
             return _properties.Remove(entity);
         }
 
-        public Task<List<Property>> GetAvailable()
+        public Task<List<Property>> GetAvailable(int limit, int offset)
         {
             var available = _properties
                 .Where(x => x.Status == PropertyStatus.Available)
+                .Skip(offset)
+                .Take(limit)
                 .ToList();
 
             return Task.FromResult(available);
