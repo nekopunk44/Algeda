@@ -397,28 +397,27 @@ namespace Application.Services
         public async Task<DealWorkflowResponse> CancelMySaleRequest(string email, Guid dealId)
         {
             var clientId = await ResolveClientIdByEmail(email);
-            var deal = await _repository.GetByIdWithNotes(dealId);
-            if (deal is null
-                || deal.ClientId != clientId
-                || deal.Source != DealSource.Sale)
+            var deal = await _repository.ExecuteWorkflow(dealId, async () =>
             {
-                throw new NotFoundException("Заявка на продажу не найдена.");
-            }
+                var lockedDeal = await _repository.GetByIdWithNotes(dealId);
+                if (lockedDeal is null
+                    || lockedDeal.ClientId != clientId
+                    || lockedDeal.Source != DealSource.Sale)
+                {
+                    throw new NotFoundException("Заявка на продажу не найдена.");
+                }
 
-            if (deal.Status == DealStatus.Completed)
-                throw new ValidationException("Нельзя отменить завершённую заявку.");
+                if (lockedDeal.Status == DealStatus.Completed)
+                    throw new ConflictException("Нельзя отменить завершённую заявку.");
 
-            // Запоминаем до изменения статуса
-            var propertyId = deal.PropertyId;
+                if (lockedDeal.Status != DealStatus.Cancelled)
+                {
+                    lockedDeal.Cancel();
+                    _repository.Update(lockedDeal);
+                }
 
-            deal.Cancel();
-            _repository.Update(deal);
-
-            // Раскрываем объект, если нет других активных заявок на него
-            if (propertyId != Guid.Empty && deal.Source != DealSource.Sale)
-            {
-                await TryRestorePropertyAfterDealDeactivated(propertyId, deal.Id);
-            }
+                return lockedDeal;
+            });
 
             return (await MapWorkflowResponses([deal]))[0];
         }

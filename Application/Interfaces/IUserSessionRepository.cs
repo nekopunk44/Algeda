@@ -24,5 +24,11 @@ public interface IUserSessionRepository
         DateTime nowUtc,
         CancellationToken cancellationToken = default);
 
+    Task RevokeAll(
+        Guid userId,
+        DateTime revokedAtUtc,
+        Guid? exceptSessionId = null,
+        CancellationToken cancellationToken = default);
+
     Task SaveChanges(CancellationToken cancellationToken = default);
 }

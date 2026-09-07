@@ -1,4 +1,4 @@
-﻿namespace Application.DTOs.Auth
+namespace Application.DTOs.Auth
 {
     public record IdentityUserAccessResponse(
         Guid UserId,

@@ -136,6 +136,23 @@ public sealed class UserSessionService
         await _sessions.SaveChanges(cancellationToken);
     }
 
+    public Task RevokeAll(
+        Guid userId,
+        Guid? exceptSessionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (userId == Guid.Empty)
+        {
+            throw new ValidationException("Пользователь не найден.");
+        }
+
+        return _sessions.RevokeAll(
+            userId,
+            DateTime.UtcNow,
+            exceptSessionId,
+            cancellationToken);
+    }
+
     private async Task CompactDuplicateSessions(
         Guid userId,
         Guid? currentSessionId,

@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Application.DTOs.PropertyMatching;
 using Application.Exceptions;
 using Application.Interfaces;

@@ -5,7 +5,7 @@ namespace Application.Interfaces
 {
     public interface IPropertyRepository : IRepository<Property>
     {
-        Task<List<Property>> GetAvailable();
+        Task<List<Property>> GetAvailable(int limit, int offset);
         Task<List<Property>> GetByResponsibleRealtor(Guid realtorId, DateTime fromUtc);
         Task<List<Property>> GetByIds(IReadOnlyCollection<Guid> ids);
         Task<Property?> GetByIdForUpdateWithCriteria(Guid id);

@@ -1,4 +1,4 @@
-﻿using Application.DTOs.PropertyCriterionDefinition;
+using Application.DTOs.PropertyCriterionDefinition;
 using Application.Exceptions;
 using Application.Interfaces;
 using AutoMapper;

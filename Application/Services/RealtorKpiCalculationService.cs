@@ -1,4 +1,4 @@
-﻿using Application.DTOs.RealtorKpi;
+using Application.DTOs.RealtorKpi;
 using Application.Interfaces;
 
 namespace Application.Services

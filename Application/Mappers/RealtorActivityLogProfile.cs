@@ -1,4 +1,4 @@
-﻿using Application.DTOs.RealtorActivity;
+using Application.DTOs.RealtorActivity;
 using AutoMapper;
 using Domain.Entities;
 using System;

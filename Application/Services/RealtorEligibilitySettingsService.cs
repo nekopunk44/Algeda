@@ -15,23 +15,37 @@ namespace Application.Services
 
         private readonly object _sync = new();
         private readonly ISystemSettingRepository _settingsRepository;
-        private EligibilityOptions _current;
+        private readonly EligibilityOptions _fallback;
+        private EligibilityOptions? _current;
 
         public RealtorEligibilitySettingsService(
             IOptions<RealtorEfficiencyOptions> options,
             ISystemSettingRepository settingsRepository)
         {
             _settingsRepository = settingsRepository;
-            _current = LoadCurrent(options.Value.Eligibility);
-            EnsureValid(_current);
+            _fallback = options.Value.Eligibility;
         }
 
         public EligibilityOptions GetCurrent()
         {
             lock (_sync)
             {
-                return Clone(_current);
+                return Clone(GetLoaded());
             }
+        }
+
+        // Настройки читаются из БД лениво, при первом обращении в рамках scope:
+        // сервис резолвится на каждый запрос, и запрос в конструкторе бил бы в БД
+        // даже там, где ограничения не нужны.
+        private EligibilityOptions GetLoaded()
+        {
+            if (_current is null)
+            {
+                _current = LoadCurrent(_fallback);
+                EnsureValid(_current);
+            }
+
+            return _current;
         }
 
         public RealtorEligibilitySettingsResponse GetForAdmin()

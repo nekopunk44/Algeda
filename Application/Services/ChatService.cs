@@ -1,4 +1,4 @@
-﻿using Application.DTOs.ChatMessage;
+using Application.DTOs.ChatMessage;
 using Application.Exceptions;
 using Application.Interfaces;
 using AutoMapper;

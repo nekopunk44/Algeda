@@ -1,4 +1,4 @@
-﻿namespace Application.DTOs.PropertyCriterionDefinition
+namespace Application.DTOs.PropertyCriterionDefinition
 {
     public record PagedPropertyCriterionDefinitionResponse(
         int Page,

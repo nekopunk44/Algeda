@@ -155,9 +155,9 @@ namespace Application.Services
                 throw new NotFoundException("Объект не найден.");
         }
 
-        public async Task<List<PropertyResponse>> GetAvailable()
+        public async Task<List<PropertyResponse>> GetAvailable(int limit, int offset)
         {
-            var list = await _repository.GetAvailable();
+            var list = await _repository.GetAvailable(limit, offset);
 
             return _mapper.Map<List<PropertyResponse>>(list);
         }

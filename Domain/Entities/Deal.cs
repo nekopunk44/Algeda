@@ -1,4 +1,4 @@
-﻿using Domain.Common;
+using Domain.Common;
 using Domain.Enums;
 using Domain.Primitives;
 using Domain.ValueObjects;
@@ -118,6 +118,9 @@ namespace Domain.Entities
             if (realtorId == Guid.Empty)
                 throw new DomainException(ValidationMessages.InvalidGuid(nameof(realtorId)));
 
+            if (Status is DealStatus.Completed or DealStatus.Cancelled)
+                throw new DomainException(ValidationMessages.CannotChangeState("Сделка"));
+
             RealtorId = realtorId;
             ClearPriority();
 
@@ -215,6 +218,9 @@ namespace Domain.Entities
         {
             if (Status == DealStatus.Completed)
                 throw new DomainException(ValidationMessages.AlreadyInState("Сделка", "Завершена"));
+
+            if (Status == DealStatus.Cancelled)
+                throw new DomainException(ValidationMessages.CannotChangeState("Сделка"));
 
             if (RealtorId == Guid.Empty)
                 throw new DomainException("Нельзя завершить сделку без назначенного риелтора.");

@@ -1,4 +1,4 @@
-﻿using Application.DTOs.DealChat;
+using Application.DTOs.DealChat;
 using Application.Exceptions;
 using Application.Interfaces;
 using Domain.Entities;

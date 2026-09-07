@@ -1,4 +1,4 @@
-﻿using Application.DTOs.Profile;
+using Application.DTOs.Profile;
 using Application.DTOs.PropertyPhotos;
 using Application.Exceptions;
 using Application.Interfaces;

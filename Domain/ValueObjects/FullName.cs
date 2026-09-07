@@ -1,4 +1,4 @@
-﻿using Domain.Common;
+using Domain.Common;
 using Domain.Primitives;
 using System;
 using System.Collections.Generic;

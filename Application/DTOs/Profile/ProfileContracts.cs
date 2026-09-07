@@ -1,4 +1,4 @@
-﻿namespace Application.DTOs.Profile;
+namespace Application.DTOs.Profile;
 
 public sealed record UserProfileResponse(
     string Email,

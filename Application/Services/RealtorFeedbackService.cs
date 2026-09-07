@@ -1,4 +1,4 @@
-﻿using Application.DTOs.RealtorEfficiency;
+using Application.DTOs.RealtorEfficiency;
 using Application.Exceptions;
 using Application.Interfaces;
 using AutoMapper;

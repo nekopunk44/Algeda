@@ -9,6 +9,12 @@ public sealed class PropertyPhotoStorageOptions
     [Range(1, 50 * 1024 * 1024)]
     public int MaxUploadBytes { get; set; } = 12 * 1024 * 1024;
 
+    [Range(1, 64 * 1024 * 1024)]
+    public int MaxTotalUploadBytes { get; set; } = 48 * 1024 * 1024;
+
+    [Range(1_000_000, 100_000_000)]
+    public long MaxSourcePixels { get; set; } = 40_000_000;
+
     [Range(256, 8192)]
     public int MaxWidth { get; set; } = 2560;
 
@@ -26,7 +32,7 @@ public sealed class PropertyPhotoStorageOptions
 
 public sealed class LegacyPropertyPhotoMigrationOptions
 {
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; }
 
     public string WebRootPath { get; set; } = @"..\Web\wwwroot";
 

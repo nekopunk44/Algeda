@@ -4,11 +4,15 @@ using Application.Interfaces;
 using Application.Options;
 using Domain.Primitives;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Application.Services
 {
     public sealed class RealtorLevelSettingsService : IRealtorLevelSettingsService
     {
+        private const string SettingKey = "RealtorLevelRules";
+
         private static readonly RealtorLevel[] RequiredLevels =
         [
             RealtorLevel.Junior,
@@ -16,21 +20,44 @@ namespace Application.Services
             RealtorLevel.Top
         ];
 
-        private readonly object _sync = new();
-        private RealtorLevelRulesOptions _current;
-
-        public RealtorLevelSettingsService(IOptions<RealtorEfficiencyOptions> options)
+        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
         {
-            _current = Normalize(Clone(options.Value.LevelRules));
-            EnsureValid(_current);
+            Converters = { new JsonStringEnumConverter() }
+        };
+
+        private readonly object _sync = new();
+        private readonly ISystemSettingRepository _settingsRepository;
+        private readonly RealtorLevelRulesOptions _fallback;
+        private RealtorLevelRulesOptions? _current;
+
+        public RealtorLevelSettingsService(
+            IOptions<RealtorEfficiencyOptions> options,
+            ISystemSettingRepository settingsRepository)
+        {
+            _settingsRepository = settingsRepository;
+            _fallback = options.Value.LevelRules;
         }
 
         public RealtorLevelRulesOptions GetCurrent()
         {
             lock (_sync)
             {
-                return Clone(_current);
+                return Clone(GetLoaded());
             }
+        }
+
+        // Настройки читаются из БД лениво, при первом обращении в рамках scope:
+        // сервис резолвится на каждый запрос, и запрос в конструкторе бил бы в БД
+        // даже там, где правила уровней не нужны.
+        private RealtorLevelRulesOptions GetLoaded()
+        {
+            if (_current is null)
+            {
+                _current = LoadCurrent(_fallback);
+                EnsureValid(_current);
+            }
+
+            return _current;
         }
 
         public RealtorLevelSettingsResponse GetForAdmin()
@@ -69,9 +96,35 @@ namespace Application.Services
             updated = Normalize(updated);
             EnsureValid(updated);
 
+            _settingsRepository.Upsert(
+                SettingKey,
+                JsonSerializer.Serialize(updated, JsonOptions));
+
             lock (_sync)
             {
                 _current = Clone(updated);
+            }
+        }
+
+        private RealtorLevelRulesOptions LoadCurrent(RealtorLevelRulesOptions fallback)
+        {
+            var fallbackValue = Normalize(Clone(fallback));
+            var storedValue = _settingsRepository.GetValue(SettingKey);
+            if (string.IsNullOrWhiteSpace(storedValue))
+            {
+                return fallbackValue;
+            }
+
+            try
+            {
+                var stored = JsonSerializer.Deserialize<RealtorLevelRulesOptions>(storedValue, JsonOptions);
+                return stored is null
+                    ? fallbackValue
+                    : Normalize(Clone(stored));
+            }
+            catch (JsonException)
+            {
+                return fallbackValue;
             }
         }
 

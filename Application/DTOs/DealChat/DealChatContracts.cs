@@ -1,4 +1,4 @@
-﻿namespace Application.DTOs.DealChat;
+namespace Application.DTOs.DealChat;
 
 public sealed record SendDealChatMessageRequest(string Content);
 
