@@ -366,6 +366,7 @@ FodyWeavers.xsd
 .env
 .env.*
 !.env.example
+!.env.production.example
 *.backup
 *.bak
 *.dump
@@ -374,6 +375,7 @@ FodyWeavers.xsd
 *.sqlite3
 *.db
 db-backups/
+deploy/secrets/
 DBHelper/
 scratch/
 .tmp/

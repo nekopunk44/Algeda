@@ -1,0 +1,271 @@
+name: algeda
+
+x-dotnet-security: &dotnet-security
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=256m,uid=1654,gid=1654
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 256
+  stop_grace_period: 30s
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
+services:
+  postgres:
+    image: ${POSTGIS_IMAGE:-postgis/postgis:18-3.6}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-algeda}
+      POSTGRES_USER: ${POSTGRES_USER:-algeda}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      ALGEDA_APP_DB_USER: ${ALGEDA_APP_DB_USER:-algeda_app}
+      ALGEDA_APP_DB_PASSWORD_FILE: /run/secrets/app_db_password
+      ALGEDA_MIGRATION_DB_USER: ${ALGEDA_MIGRATION_DB_USER:-algeda_migrator}
+      ALGEDA_MIGRATION_DB_PASSWORD_FILE: /run/secrets/migration_db_password
+    secrets:
+      - postgres_password
+      - app_db_password
+      - migration_db_password
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./deploy/initdb/20-create-algeda-roles.sh:/docker-entrypoint-initdb.d/20-create-algeda-roles.sh:ro
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 1m
+    shm_size: 256m
+    logging: *default-logging
+
+  migrate:
+    <<: *dotnet-security
+    image: ${ALGEDA_API_IMAGE:-algeda-api}:${ALGEDA_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: API/Dockerfile
+    command: ["--migrate"]
+    restart: "no"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      Email__Enabled: "false"
+      GmailApi__Enabled: "false"
+      IdentitySeed__Enabled: "false"
+      Seeding__PropertyCriteriaDictionary__RunOnStartup: "false"
+      AutoMatchingWorker__Enabled: "false"
+      PropertyPhotoStorage__LegacyMigration__Enabled: "false"
+    secrets:
+      - source: migration_connection_string
+        target: ConnectionStrings__DefaultConnection
+      - source: jwt_signing_key
+        target: Jwt__SigningKey
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - data
+    logging: *default-logging
+
+  api:
+    <<: *dotnet-security
+    image: ${ALGEDA_API_IMAGE:-algeda-api}:${ALGEDA_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: API/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      AllowedHosts: ${API_HOSTNAME:?Set API_HOSTNAME in .env.production};api;localhost
+      Cors__AllowedOrigins__0: https://${WEB_HOSTNAME:?Set WEB_HOSTNAME in .env.production}
+      ReverseProxy__Enabled: "true"
+      ReverseProxy__ForwardLimit: "1"
+      ReverseProxy__KnownNetworks__0: 172.30.0.0/24
+      Email__Enabled: "true"
+      Email__Host: ${EMAIL_HOST:?Set EMAIL_HOST in .env.production}
+      Email__Port: ${EMAIL_PORT:-465}
+      Email__User: ${EMAIL_USER:?Set EMAIL_USER in .env.production}
+      Email__FromAddress: ${EMAIL_FROM_ADDRESS:?Set EMAIL_FROM_ADDRESS in .env.production}
+      Email__FromName: ${EMAIL_FROM_NAME:-Algeda}
+      Email__UseSsl: ${EMAIL_USE_SSL:-true}
+      GmailApi__Enabled: "false"
+      IdentitySeed__Enabled: "false"
+      Seeding__PropertyCriteriaDictionary__RunOnStartup: "false"
+      AutoMatchingWorker__Enabled: "true"
+      PropertyPhotoStorage__LegacyMigration__Enabled: "false"
+    secrets:
+      - source: api_connection_string
+        target: ConnectionStrings__DefaultConnection
+      - source: jwt_signing_key
+        target: Jwt__SigningKey
+      - source: email_password
+        target: Email__Password
+      - source: automapper_license_key
+        target: AutoMapper__LicenseKey
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "8080"
+    networks:
+      - edge
+      - data
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/algeda-healthcheck", "/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging: *default-logging
+
+  web:
+    <<: *dotnet-security
+    image: ${ALGEDA_WEB_IMAGE:-algeda-web}:${ALGEDA_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Web/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      AllowedHosts: ${WEB_HOSTNAME:?Set WEB_HOSTNAME in .env.production};web;localhost
+      Api__BaseUrl: http://api:8080
+      ReverseProxy__Enabled: "true"
+      ReverseProxy__ForwardLimit: "1"
+      ReverseProxy__KnownNetworks__0: 172.30.0.0/24
+      DataProtection__KeysPath: /var/lib/algeda/dataprotection-keys
+      DataProtection__ApplicationName: Algeda.Web
+      Kestrel__Limits__MaxRequestBodySize: "67108864"
+    volumes:
+      - web_dataprotection_keys:/var/lib/algeda/dataprotection-keys
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "8080"
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/algeda-healthcheck", "/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging: *default-logging
+
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2.11.4-alpine}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.production}
+      WEB_HOSTNAME: ${WEB_HOSTNAME:?Set WEB_HOSTNAME in .env.production}
+      API_HOSTNAME: ${API_HOSTNAME:?Set API_HOSTNAME in .env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks:
+      - edge
+    logging: *default-logging
+
+  bootstrap-admin:
+    <<: *dotnet-security
+    profiles: ["ops"]
+    image: ${ALGEDA_API_IMAGE:-algeda-api}:${ALGEDA_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: API/Dockerfile
+    command: ["--bootstrap-admin"]
+    restart: "no"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      IdentityBootstrap__Email: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      IdentityBootstrap__DisplayName: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-Administrator}
+      Email__Enabled: "false"
+      GmailApi__Enabled: "false"
+      IdentitySeed__Enabled: "false"
+      Seeding__PropertyCriteriaDictionary__RunOnStartup: "false"
+      AutoMatchingWorker__Enabled: "false"
+      PropertyPhotoStorage__LegacyMigration__Enabled: "false"
+    secrets:
+      - source: migration_connection_string
+        target: ConnectionStrings__DefaultConnection
+      - source: bootstrap_admin_password
+        target: IdentityBootstrap__Password
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - data
+    logging: *default-logging
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  data:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+
+volumes:
+  postgres_data:
+  web_dataprotection_keys:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  postgres_password:
+    file: ${POSTGRES_PASSWORD_FILE:?Set POSTGRES_PASSWORD_FILE in .env.production}
+  app_db_password:
+    file: ${APP_DB_PASSWORD_FILE:?Set APP_DB_PASSWORD_FILE in .env.production}
+  migration_db_password:
+    file: ${MIGRATION_DB_PASSWORD_FILE:?Set MIGRATION_DB_PASSWORD_FILE in .env.production}
+  api_connection_string:
+    file: ${API_CONNECTION_STRING_FILE:?Set API_CONNECTION_STRING_FILE in .env.production}
+  migration_connection_string:
+    file: ${MIGRATION_CONNECTION_STRING_FILE:?Set MIGRATION_CONNECTION_STRING_FILE in .env.production}
+  jwt_signing_key:
+    file: ${JWT_SIGNING_KEY_FILE:?Set JWT_SIGNING_KEY_FILE in .env.production}
+  email_password:
+    file: ${EMAIL_PASSWORD_FILE:?Set EMAIL_PASSWORD_FILE in .env.production}
+  automapper_license_key:
+    file: ${AUTOMAPPER_LICENSE_KEY_FILE:?Set AUTOMAPPER_LICENSE_KEY_FILE in .env.production}
+  bootstrap_admin_password:
+    file: ${BOOTSTRAP_ADMIN_PASSWORD_FILE:?Set BOOTSTRAP_ADMIN_PASSWORD_FILE in .env.production}

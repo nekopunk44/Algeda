@@ -1,0 +1,55 @@
+{
+    admin off
+    email {$ACME_EMAIL}
+}
+
+(security_headers) {
+    header {
+        -Server
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+}
+
+{$WEB_HOSTNAME} {
+    import security_headers
+    encode zstd gzip
+
+    request_body {
+        max_size 64MB
+    }
+
+    reverse_proxy web:8080 {
+        health_uri /health/live
+        health_interval 30s
+        health_timeout 5s
+
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 60s
+        }
+    }
+}
+
+{$API_HOSTNAME} {
+    import security_headers
+    encode zstd gzip
+
+    request_body {
+        max_size 64MB
+    }
+
+    reverse_proxy api:8080 {
+        health_uri /health/live
+        health_interval 30s
+        health_timeout 5s
+
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 60s
+        }
+    }
+}
