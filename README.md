@@ -91,10 +91,51 @@ flutter run -d android `
 
 Подробнее: [Mobile/README.md](Mobile/README.md).
 
+## Продакшен-деплой
+
+Продакшен-контур описан в `compose.production.yml` (PostGIS, миграции, API,
+Web, Caddy с автоматическим TLS) и каталоге `deploy/`. Секреты передаются
+только через файлы (`secrets:` в Compose), не через переменные окружения.
+
+Первый запуск на сервере:
+
+```bash
+cp .env.production.example .env.production
+# Заполни хосты, email для ACME и SMTP-настройки.
+
+bash deploy/generate-secrets.sh
+# Создаст deploy/secrets/ со случайными паролями БД, JWT-ключом и паролем
+# администратора. Файлы email_password и automapper_license_key нужно
+# заполнить вручную.
+
+docker compose -f compose.production.yml --env-file .env.production build
+docker compose -f compose.production.yml --env-file .env.production up -d
+# Сервис migrate применит миграции, после чего поднимутся api, web и caddy.
+
+docker compose -f compose.production.yml --env-file .env.production \
+  --profile ops run --rm bootstrap-admin
+# Одноразовое создание администратора из BOOTSTRAP_ADMIN_EMAIL и
+# deploy/secrets/bootstrap_admin_password.
+```
+
+DNS-записи `WEB_HOSTNAME` и `API_HOSTNAME` должны указывать на сервер до
+старта Caddy, иначе выпуск сертификатов не пройдёт.
+
+Обновление: собрать новые образы (или сменить `ALGEDA_IMAGE_TAG`) и повторить
+`up -d` — миграции применятся автоматически до перезапуска API.
+
+Бэкапы: `deploy/backup-postgres.sh` снимает проверенный дамп в `db-backups/`
+(копируй его в зашифрованное хранилище вне сервера), восстановление —
+`deploy/restore-postgres.sh`. Роли и права БД создаются скриптом
+`deploy/initdb/20-create-algeda-roles.sh` только при инициализации пустого
+тома; при восстановлении на новом сервере сначала поднимается чистый
+postgres, затем выполняется restore.
+
 ## Проверки
 
 ```powershell
 dotnet test Algeda.slnx -c Release
+dotnet format Algeda.slnx --verify-no-changes
 dotnet list Algeda.slnx package --vulnerable --include-transitive
 
 cd Mobile
