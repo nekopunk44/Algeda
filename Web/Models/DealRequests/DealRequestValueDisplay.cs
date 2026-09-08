@@ -1,4 +1,4 @@
-﻿namespace Web.Models.DealRequests;
+namespace Web.Models.DealRequests;
 
 public static class DealRequestValueDisplay
 {

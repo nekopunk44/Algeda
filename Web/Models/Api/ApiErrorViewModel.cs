@@ -1,4 +1,4 @@
-﻿namespace Web.Models.Api
+namespace Web.Models.Api
 {
     public sealed class ApiErrorViewModel
     {

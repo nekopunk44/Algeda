@@ -1,4 +1,4 @@
-﻿namespace Web.Models.Dashboard;
+namespace Web.Models.Dashboard;
 
 public static class DashboardValueDisplay
 {

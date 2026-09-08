@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Web.Models.Api;
 using Web.Models.Dashboard;
 

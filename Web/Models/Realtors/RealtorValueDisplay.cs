@@ -1,4 +1,4 @@
-﻿namespace Web.Models.Realtors;
+namespace Web.Models.Realtors;
 
 public static class RealtorValueDisplay
 {

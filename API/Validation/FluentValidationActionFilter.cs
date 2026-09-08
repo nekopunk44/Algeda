@@ -94,35 +94,35 @@ namespace API.Validation
                 switch (pair.Value)
                 {
                     case CreateMySaleRequest create when create.Property is not null:
-                    {
-                        var updatedProperty = create.Property with
                         {
-                            OwnerFullName = ownerFullName,
-                            OwnerEmail = ownerEmail,
-                            OwnerPhoneNumber = ownerPhone
-                        };
+                            var updatedProperty = create.Property with
+                            {
+                                OwnerFullName = ownerFullName,
+                                OwnerEmail = ownerEmail,
+                                OwnerPhoneNumber = ownerPhone
+                            };
 
-                        context.ActionArguments[pair.Key] = create with
-                        {
-                            Property = updatedProperty
-                        };
-                        break;
-                    }
+                            context.ActionArguments[pair.Key] = create with
+                            {
+                                Property = updatedProperty
+                            };
+                            break;
+                        }
                     case UpdateMySaleRequest update when update.Property is not null:
-                    {
-                        var updatedProperty = update.Property with
                         {
-                            OwnerFullName = ownerFullName,
-                            OwnerEmail = ownerEmail,
-                            OwnerPhoneNumber = ownerPhone
-                        };
+                            var updatedProperty = update.Property with
+                            {
+                                OwnerFullName = ownerFullName,
+                                OwnerEmail = ownerEmail,
+                                OwnerPhoneNumber = ownerPhone
+                            };
 
-                        context.ActionArguments[pair.Key] = update with
-                        {
-                            Property = updatedProperty
-                        };
-                        break;
-                    }
+                            context.ActionArguments[pair.Key] = update with
+                            {
+                                Property = updatedProperty
+                            };
+                            break;
+                        }
                 }
             }
         }

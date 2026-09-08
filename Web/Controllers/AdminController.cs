@@ -1709,8 +1709,8 @@ public class AdminController : Controller
         var actorEmail = item.ActorEmail;
         if (item.ActorUserId.HasValue && usersById.TryGetValue(item.ActorUserId.Value, out var user))
         {
-             if (!string.IsNullOrWhiteSpace(user.DisplayName)) actorDisplayName = user.DisplayName;
-             if (string.IsNullOrWhiteSpace(item.ActorEmail)) actorEmail = user.Email;
+            if (!string.IsNullOrWhiteSpace(user.DisplayName)) actorDisplayName = user.DisplayName;
+            if (string.IsNullOrWhiteSpace(item.ActorEmail)) actorEmail = user.Email;
         }
 
         return new DealDocumentAccessLogItemViewModel

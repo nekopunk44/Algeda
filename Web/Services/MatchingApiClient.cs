@@ -1,4 +1,4 @@
-﻿using Web.Models.Api;
+using Web.Models.Api;
 using Web.Models.Dashboard;
 
 namespace Web.Services;
