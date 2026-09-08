@@ -4,13 +4,19 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   dotnet:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -18,22 +24,89 @@ jobs:
       - name: Set up .NET 10
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore Algeda.slnx
+
+      - name: Check formatting
+        run: dotnet format Algeda.slnx --verify-no-changes --no-restore
 
       - name: Build
         run: dotnet build Algeda.slnx -c Release --no-restore
 
       - name: Test
-        run: dotnet test Algeda.slnx -c Release --no-build
+        run: >-
+          dotnet test Algeda.slnx -c Release --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dotnet-test-results
+          path: |
+            **/TestResults/**/*.trx
+            **/TestResults/**/coverage.cobertura.xml
+          if-no-files-found: ignore
 
       - name: Audit NuGet packages
-        run: dotnet list Algeda.slnx package --vulnerable --include-transitive --no-restore
+        run: |
+          dotnet list Algeda.slnx package --vulnerable --include-transitive --no-restore --format json > vulnerable.json
+          cat vulnerable.json
+          vulnerable_count=$(jq '[.projects[]?.frameworks[]?.topLevelPackages[]?, .projects[]?.frameworks[]?.transitivePackages[]?] | length' vulnerable.json)
+          if [ "$vulnerable_count" != "0" ]; then
+            echo "Found $vulnerable_count vulnerable package reference(s)." >&2
+            exit 1
+          fi
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dockerfile: API/Dockerfile
+            image: algeda-api
+          - dockerfile: Web/Dockerfile
+            image: algeda-web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build image
+        run: docker build -f ${{ matrix.dockerfile }} -t ${{ matrix.image }}:ci .
+
+  deploy-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check shell scripts are executable in git
+        run: |
+          bad=$(git ls-files -s -- '*.sh' | awk '$1 != "100755"' || true)
+          if [ -n "$bad" ]; then
+            echo "These scripts are tracked without the executable bit:" >&2
+            echo "$bad" >&2
+            echo 'Fix with: git update-index --chmod=+x <file>' >&2
+            exit 1
+          fi
+
+      - name: Lint shell scripts
+        run: shellcheck deploy/*.sh deploy/initdb/*.sh
+
+      - name: Validate production compose file
+        run: |
+          bash deploy/generate-secrets.sh
+          docker compose -f compose.production.yml --env-file .env.production.example config --quiet
 
   android:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: Mobile
@@ -65,3 +138,10 @@ jobs:
           flutter build apk --debug
           --dart-define=API_BASE_URL=http://10.0.2.2:5142
           --dart-define=WEB_BASE_URL=http://10.0.2.2:5000
+
+      - name: Upload APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: app-debug-apk
+          path: Mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
